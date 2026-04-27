@@ -1,0 +1,76 @@
+spring:
+  application:
+    name: argus-review
+
+  # Java 21 Virtual Threads 支持（Spring Boot 3.2+ 自动启用）
+  threads:
+    virtual:
+      enabled: true
+
+  # WebFlux 配置
+  webflux:
+    base-path: /
+
+# LangChain4j 配置：接入本地 codex 中转 (packycode)
+# API Key 通过环境变量 OPENAI_API_KEY 注入，避免硬编码
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://www.packyapi.com/v1
+      api-key: ${OPENAI_API_KEY:}
+      model-name: gpt-5.4
+      temperature: 0.2
+      timeout: PT60S
+      log-requests: true
+      log-responses: true
+    streaming-chat-model:
+      base-url: https://www.packyapi.com/v1
+      api-key: ${OPENAI_API_KEY:}
+      model-name: gpt-5.4
+      temperature: 0.2
+      timeout: PT120S
+    # embedding-model 使用本地 ONNX BGE，见 LangChain4jConfig，无需远程 API
+
+# Actuator 与管理端点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# GitHub 集成配置
+github:
+  api:
+    base-url: https://api.github.com
+    token: ${GITHUB_API_TOKEN:}
+  webhook:
+    secret: ${GITHUB_WEBHOOK_SECRET:}
+
+argus:
+  rag:
+    preload:
+      enabled: true
+      directory: docs/specs
+      clear-before-load: false
+      extensions: md,txt,java
+    milvus:
+      host: ${MILVUS_HOST:localhost}
+      port: ${MILVUS_PORT:19530}
+      collection-name: ${MILVUS_COLLECTION:code_review_specs}
+      dimension: ${MILVUS_DIMENSION:384}
+      index-type: ${MILVUS_INDEX_TYPE:AUTOINDEX}
+      metric-type: ${MILVUS_METRIC_TYPE:COSINE}
+      consistency-level: ${MILVUS_CONSISTENCY_LEVEL:BOUNDED}
+      database-name: ${MILVUS_DATABASE_NAME:}
+      username: ${MILVUS_USERNAME:}
+      password: ${MILVUS_PASSWORD:}
+      token: ${MILVUS_TOKEN:}
+
+# 日志
+logging:
+  level:
+    com.argus.review: INFO
+    dev.langchain4j: DEBUG
