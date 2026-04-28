@@ -5,12 +5,18 @@ import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import dev.langchain4j.service.spring.AiService;
+import dev.langchain4j.service.spring.AiServiceWiringMode;
 
 /**
  * 业务逻辑审查 Agent。
  * <p>专注业务流程正确性、边界条件处理、并发安全及数据一致性。</p>
  */
-@AiService
+@AiService(
+    wiringMode = AiServiceWiringMode.EXPLICIT,
+    chatModel = "chatLanguageModel",
+    streamingChatModel = "streamingChatLanguageModel",
+    tools = "gitDiffTool"
+)
 public interface LogicAgent extends CodeReviewAgent {
 
     @Override

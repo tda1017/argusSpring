@@ -1,10 +1,15 @@
 package com.argus.review.domain.tool;
 
 import com.argus.review.application.port.out.GitHubPort;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.agent.tool.ToolSpecifications;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * GitDiffTool 参数解析测试。
@@ -48,6 +53,23 @@ class GitDiffToolTest {
         String diff = gitDiffTool.fetchCommitDiff("https://github.com/openai/codex/commit/abc123", "");
 
         assertEquals("commit-diff", diff);
+    }
+
+    /**
+     * Tool schema 必须暴露真实参数名，否则 LLM 只能看到 arg0/arg1。
+     */
+    @Test
+    void shouldExposeStableToolParameterNames() {
+        List<ToolSpecification> specifications = ToolSpecifications.toolSpecificationsFrom(GitDiffTool.class);
+
+        ToolSpecification fetchMrDiff = specifications.stream()
+            .filter(specification -> "fetchMrDiff".equals(specification.name()))
+            .findFirst()
+            .orElseThrow();
+
+        assertTrue(fetchMrDiff.parameters().properties().containsKey("projectId"));
+        assertTrue(fetchMrDiff.parameters().properties().containsKey("mrId"));
+        assertTrue(fetchMrDiff.parameters().required().contains("projectId"));
     }
 
     private static final class StubGitHubPort implements GitHubPort {

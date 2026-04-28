@@ -138,8 +138,33 @@
 - [x] 13. **VirtualThread Executor 共享优化** ✅ 已修复
     - ~~*Details*: `ReviewApplicationService.review()` 每次创建 3 个 Executor，已合并为 1 个共享实例~~
 
-- [ ] 14. **application.yml embedding-model 配置清理** ✅ 已修复
+- [x] 14. **application.yml embedding-model 配置清理** ✅ 已修复
     - ~~*Details*: 移除多余远程 embedding-model 配置，避免与本地 ONNX Bean 冲突~~
+
+- [x] 15. **GitDiffTool 真正注册到 Agent**
+    - *Priority*: HIGH
+    - *Goal*: 避免 `@Tool` 只定义不使用
+    - *Details*: `GitDiffTool` 注册为 Spring Bean；三个 `@AiService` 显式绑定 `gitDiffTool`；PackyCode 模型支持 OpenAI `tools/tool_calls` 协议
+    - *Affected files*: `GitDiffTool.java`, `SecurityAgent.java`, `StyleAgent.java`, `LogicAgent.java`, `PackyCodeChatModel.java`, `PackyCodeStreamingChatModel.java`
+    - *Requirements*: F-01
+
+- [x] 16. **性能基准脚本**
+    - *Priority*: MEDIUM
+    - *Goal*: TTFT、总耗时、并发吞吐用脚本测，不再写无依据数字
+    - *Details*: 新增 `scripts/benchmark-review.sh`，支持 `stream/sync`、请求数、并发数、外部 payload
+    - *Requirements*: 非功能需求/性能
+
+- [x] 17. **真实 LLM 测试隔离**
+    - *Priority*: HIGH
+    - *Goal*: `mvn test` 不再默认访问真实 LLM 或本机私有配置
+    - *Details*: 真实 LLM 测试仅在 `ARGUS_RUN_LLM_TESTS=true` 且存在 `OPENAI_API_KEY` 时执行
+    - *Affected files*: `LlmLinkVerificationTest.java`, `Gpt54StreamingTest.java`, `PackyCodeDebugTest.java`
+    - *Requirements*: 测试稳定性
+
+- [x] 18. **简历真实性文档更新**
+    - *Priority*: MEDIUM
+    - *Goal*: `resume-vs-reality-analysis.md` 与当前代码同步
+    - *Details*: 更新 `@Tool`、RAG 预加载、模型命名、剩余风险描述
 
 ## Task Dependencies
 
@@ -161,5 +186,5 @@ Task 7 (测试) ── 各层完成后
 ## Current Status
 
 - **MVP 已实现**: Task 1-7 全部完成，编译通过，启动成功（4.5s），单元测试全绿
-- **已修复**: Task 8-14 已完成，其中 Task 13（Executor 共享）、Task 14（yml 配置清理）已落地
-- **当前状态**: `tasks.md` 中列出的开发任务已全部完成
+- **已修复**: Task 8-18 已完成，其中 `@Tool` 注册、性能基准脚本、真实 LLM 测试隔离已落地
+- **当前状态**: MVP 功能闭环已完成；剩余工作是跑真实基准、补检索评估集、按实测数据改简历表述

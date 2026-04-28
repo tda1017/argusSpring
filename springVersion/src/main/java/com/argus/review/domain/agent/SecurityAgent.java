@@ -5,12 +5,18 @@ import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import dev.langchain4j.service.spring.AiService;
+import dev.langchain4j.service.spring.AiServiceWiringMode;
 
 /**
  * 安全漏洞审查 Agent。
  * <p>专注识别 OWASP Top 10、注入漏洞、敏感信息泄露、权限绕过等安全问题。</p>
  */
-@AiService
+@AiService(
+    wiringMode = AiServiceWiringMode.EXPLICIT,
+    chatModel = "chatLanguageModel",
+    streamingChatModel = "streamingChatLanguageModel",
+    tools = "gitDiffTool"
+)
 public interface SecurityAgent extends CodeReviewAgent {
 
     @Override

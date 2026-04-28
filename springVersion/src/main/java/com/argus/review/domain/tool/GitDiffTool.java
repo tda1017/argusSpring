@@ -1,9 +1,11 @@
 package com.argus.review.domain.tool;
 
 import com.argus.review.application.port.out.GitHubPort;
+import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.time.Duration;
@@ -14,6 +16,7 @@ import java.util.Objects;
  * <p>当前接入 GitHub 真实 API，供 LLM 在需要时自主调用。</p>
  */
 @Slf4j
+@Component
 @RequiredArgsConstructor
 public class GitDiffTool {
 
@@ -28,8 +31,11 @@ public class GitDiffTool {
      * @param mrId      Merge Request IID
      * @return Diff 文本内容
      */
-    @Tool("从 GitLab/GitHub 获取指定 MR 的代码 Diff。当用户仅提供 MR 链接或 ID 时使用此工具。")
-    public String fetchMrDiff(String projectId, String mrId) {
+    @Tool("从 GitHub 获取指定 Pull Request 的代码 Diff。当用户仅提供 PR 链接或仓库与 PR 编号时使用此工具。")
+    public String fetchMrDiff(
+        @P(value = "GitHub 仓库路径，格式 owner/repo；也可直接传完整 PR URL", required = true) String projectId,
+        @P(value = "Pull Request 编号；如果 projectId 已是完整 PR URL，可为空", required = false) String mrId
+    ) {
         PullRequestTarget target = resolvePullRequestTarget(projectId, mrId);
         log.info("[Tool] 正在获取 GitHub PR Diff: {}/{}#{}", target.owner(), target.repo(), target.prNumber());
 
@@ -47,8 +53,11 @@ public class GitDiffTool {
      * @param commitSha  Commit SHA
      * @return Diff 文本内容
      */
-    @Tool("获取指定 Commit 的代码 Diff。当需要审查某个特定提交时使用此工具。")
-    public String fetchCommitDiff(String projectId, String commitSha) {
+    @Tool("从 GitHub 获取指定 Commit 的代码 Diff。当需要审查某个特定提交时使用此工具。")
+    public String fetchCommitDiff(
+        @P(value = "GitHub 仓库路径，格式 owner/repo；也可直接传完整 Commit URL", required = true) String projectId,
+        @P(value = "Commit SHA；如果 projectId 已是完整 Commit URL，可为空", required = false) String commitSha
+    ) {
         CommitTarget target = resolveCommitTarget(projectId, commitSha);
         log.info("[Tool] 正在获取 GitHub Commit Diff: {}/{}/{}", target.owner(), target.repo(), target.commitSha());
 

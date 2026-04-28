@@ -7,12 +7,15 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.output.Response;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.util.List;
 
 /**
  * 用于观察 packycode 同步接口原始返回内容的调试测试。
  */
+@EnabledIfEnvironmentVariable(named = "ARGUS_RUN_LLM_TESTS", matches = "true")
+@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
 class PackyCodeDebugTest {
 
     /**
@@ -21,11 +24,6 @@ class PackyCodeDebugTest {
     @Test
     void debugRawResponse() throws Exception {
         String apiKey = System.getenv("OPENAI_API_KEY");
-        if (apiKey == null || apiKey.isBlank()) {
-            apiKey = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
-                java.nio.file.Path.of(System.getProperty("user.home"), ".codex", "auth.json").toFile()
-            ).path("OPENAI_API_KEY").asText();
-        }
 
         PackyCodeChatModel model = PackyCodeChatModel.builder()
             .baseUrl("https://www.packyapi.com/v1")

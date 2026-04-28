@@ -5,12 +5,18 @@ import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import dev.langchain4j.service.spring.AiService;
+import dev.langchain4j.service.spring.AiServiceWiringMode;
 
 /**
  * 代码规范审查 Agent。
  * <p>专注对齐团队/企业的编码规范、命名约定、设计模式及代码整洁度。</p>
  */
-@AiService
+@AiService(
+    wiringMode = AiServiceWiringMode.EXPLICIT,
+    chatModel = "chatLanguageModel",
+    streamingChatModel = "streamingChatLanguageModel",
+    tools = "gitDiffTool"
+)
 public interface StyleAgent extends CodeReviewAgent {
 
     @Override

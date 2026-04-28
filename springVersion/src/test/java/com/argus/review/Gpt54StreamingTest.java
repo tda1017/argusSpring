@@ -8,6 +8,7 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.StreamingResponseHandler;
 import dev.langchain4j.model.output.Response;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -15,16 +16,13 @@ import java.util.concurrent.CompletableFuture;
 /**
  * 验证 PackyCodeStreamingChatModel 能否正常接收 packycode 的 SSE 输出。
  */
+@EnabledIfEnvironmentVariable(named = "ARGUS_RUN_LLM_TESTS", matches = "true")
+@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
 class Gpt54StreamingTest {
 
     @Test
     void testStreaming() throws Exception {
         String apiKey = System.getenv("OPENAI_API_KEY");
-        if (apiKey == null || apiKey.isBlank()) {
-            apiKey = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
-                java.nio.file.Path.of(System.getProperty("user.home"), ".codex", "auth.json").toFile()
-            ).path("OPENAI_API_KEY").asText();
-        }
 
         PackyCodeStreamingChatModel model = PackyCodeStreamingChatModel.builder()
             .baseUrl("https://www.packyapi.com/v1")

@@ -1,15 +1,12 @@
 package com.argus.review.infrastructure.llm;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.internal.ValidationUtils;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
-import dev.langchain4j.model.output.TokenUsage;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -59,8 +56,18 @@ public class PackyCodeChatModel implements ChatLanguageModel {
      */
     @Override
     public Response<AiMessage> generate(List<ChatMessage> messages) {
+        return generate(messages, List.of());
+    }
+
+    /**
+     * 通过 packycode 接口发起支持工具调用的对话请求。
+     */
+    @Override
+    public Response<AiMessage> generate(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications) {
         try {
-            String requestBody = buildRequestBody(messages);
+            String requestBody = OpenAiProtocolSupport.buildRequestBody(
+                objectMapper, modelName, temperature, messages, toolSpecifications
+            );
             log.debug("[PackyCode] Request body: {}", requestBody);
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -79,97 +86,10 @@ public class PackyCodeChatModel implements ChatLanguageModel {
                 throw new RuntimeException("HTTP " + response.statusCode() + ": " + responseBody);
             }
 
-            return parseSseResponse(responseBody);
+            return OpenAiProtocolSupport.parseSseBody(objectMapper, responseBody, null);
         } catch (Exception e) {
             throw new RuntimeException("PackyCode chat completion failed", e);
         }
-    }
-
-    /**
-     * 按 OpenAI Chat Completions 协议拼装请求体。
-     */
-    private String buildRequestBody(List<ChatMessage> messages) {
-        ObjectNode root = objectMapper.createObjectNode();
-        root.put("model", modelName);
-        // packycode 的 gpt-5.4 强制要求 stream=true，否则返回 content: null
-        root.put("stream", true);
-        // gpt-5.4 等 reasoning 模型通常不支持 temperature 参数
-        if (temperature != null && !modelName.contains("gpt-5")) {
-            root.put("temperature", temperature);
-        }
-
-        ArrayNode msgs = root.putArray("messages");
-        for (ChatMessage msg : messages) {
-            ObjectNode node = msgs.addObject();
-            switch (msg.type()) {
-                case SYSTEM -> {
-                    node.put("role", "system");
-                    node.put("content", msg.text());
-                }
-                case USER -> {
-                    node.put("role", "user");
-                    node.put("content", msg.text());
-                }
-                case AI -> {
-                    node.put("role", "assistant");
-                    node.put("content", msg.text());
-                }
-                default -> {
-                    node.put("role", "user");
-                    node.put("content", msg.text());
-                }
-            }
-        }
-
-        try {
-            return objectMapper.writeValueAsString(root);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * 解析 SSE 文本响应，并拼接成 LangChain4j 需要的完整消息对象。
-     */
-    private Response<AiMessage> parseSseResponse(String body) {
-        StringBuilder contentBuilder = new StringBuilder();
-        int promptTokens = 0;
-        int completionTokens = 0;
-
-        for (String line : body.split("\n")) {
-            line = line.trim();
-            if (!line.startsWith("data:")) {
-                continue;
-            }
-            String data = line.substring(5).trim();
-            if ("[DONE]".equals(data)) {
-                break;
-            }
-            try {
-                JsonNode root = objectMapper.readTree(data);
-                JsonNode choices = root.path("choices");
-                if (choices.isArray() && choices.size() > 0) {
-                    JsonNode delta = choices.get(0).path("delta");
-                    if (delta.has("content")) {
-                        String chunk = delta.path("content").asText("");
-                        contentBuilder.append(chunk);
-                    }
-                }
-                // usage 可能只在尾块出现，所以每次都尝试覆盖最新值。
-                if (root.has("usage")) {
-                    JsonNode usage = root.path("usage");
-                    promptTokens = usage.path("prompt_tokens").asInt(promptTokens);
-                    completionTokens = usage.path("completion_tokens").asInt(completionTokens);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to parse SSE chunk: {}", data, e);
-            }
-        }
-
-        String fullText = contentBuilder.toString();
-        AiMessage aiMessage = AiMessage.from(fullText);
-        TokenUsage tokenUsage = new TokenUsage(promptTokens, completionTokens);
-        return Response.from(aiMessage, tokenUsage, null);
     }
 
 }

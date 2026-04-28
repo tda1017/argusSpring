@@ -3,15 +3,13 @@ package com.argus.review;
 import com.argus.review.domain.agent.SecurityAgent;
 import com.argus.review.domain.agent.StyleAgent;
 import com.argus.review.domain.agent.LogicAgent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-
-import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -21,28 +19,13 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Slf4j
 @SpringBootTest
+@EnabledIfEnvironmentVariable(named = "ARGUS_RUN_LLM_TESTS", matches = "true")
+@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
 class LlmLinkVerificationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        String envKey = System.getenv("OPENAI_API_KEY");
-        final String apiKey;
-        if (envKey != null && !envKey.isBlank()) {
-            apiKey = envKey;
-        } else {
-            String fileKey = "";
-            try {
-                fileKey = new ObjectMapper().readTree(
-                    Path.of(System.getProperty("user.home"), ".codex", "auth.json").toFile()
-                ).path("OPENAI_API_KEY").asText("");
-            } catch (Exception e) {
-                log.warn("Failed to read API key from ~/.codex/auth.json", e);
-            }
-            apiKey = fileKey;
-        }
-        if (!apiKey.isBlank()) {
-            registry.add("langchain4j.open-ai.chat-model.api-key", () -> apiKey);
-        }
+        registry.add("langchain4j.open-ai.chat-model.api-key", () -> System.getenv("OPENAI_API_KEY"));
     }
 
     @Autowired
