@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * PackyCode tool-calling 协议适配测试。
+ * OpenAI 兼容 tool-calling 协议适配测试。
  */
 class PackyCodeChatModelToolCallTest {
 
@@ -65,7 +65,9 @@ class PackyCodeChatModelToolCallTest {
         PackyCodeChatModel model = PackyCodeChatModel.builder()
             .baseUrl("http://localhost:" + server.getAddress().getPort())
             .apiKey("test-key")
-            .modelName("gpt-5.4")
+            .modelName("deepseek-v4-pro")
+            .reasoningEffort("high")
+            .thinkingType("enabled")
             .build();
 
         Response<AiMessage> response = model.generate(
@@ -74,6 +76,9 @@ class PackyCodeChatModelToolCallTest {
         );
 
         JsonNode requestJson = objectMapper.readTree(capturedRequest.get());
+        assertEquals("deepseek-v4-pro", requestJson.path("model").asText());
+        assertEquals("high", requestJson.path("reasoning_effort").asText());
+        assertEquals("enabled", requestJson.path("thinking").path("type").asText());
         JsonNode function = requestJson.path("tools").get(0).path("function");
         assertEquals("fetchMrDiff", function.path("name").asText());
         assertEquals("object", function.path("parameters").path("type").asText());

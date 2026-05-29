@@ -15,17 +15,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * LLM 核心链路验证测试。
- * <p>自动从 ~/.codex/auth.json 读取 API Key（若环境变量未设置）。</p>
+ * <p>使用 DeepSeek 官方 OpenAI 兼容接口，API Key 从环境变量注入。</p>
  */
 @Slf4j
 @SpringBootTest
 @EnabledIfEnvironmentVariable(named = "ARGUS_RUN_LLM_TESTS", matches = "true")
-@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "DEEPSEEK_API_KEY", matches = ".+")
 class LlmLinkVerificationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("langchain4j.open-ai.chat-model.api-key", () -> System.getenv("OPENAI_API_KEY"));
+        registry.add("langchain4j.open-ai.chat-model.api-key", () -> System.getenv("DEEPSEEK_API_KEY"));
+        registry.add("langchain4j.open-ai.chat-model.base-url", () -> "https://api.deepseek.com");
+        registry.add("langchain4j.open-ai.chat-model.model-name", () -> "deepseek-v4-pro");
     }
 
     @Autowired

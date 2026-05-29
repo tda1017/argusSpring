@@ -88,6 +88,11 @@ class GitDiffToolTest {
         }
 
         @Override
+        public Mono<String> fetchFileContent(String owner, String repo, String path, String ref) {
+            return Mono.just("");
+        }
+
+        @Override
         public Mono<Long> postPrComment(String owner, String repo, int prNumber, String body) {
             return Mono.just(1L);
         }

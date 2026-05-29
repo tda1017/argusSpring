@@ -21,7 +21,7 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * 自定义 StreamingChatLanguageModel，对接 packycode SSE 流式输出。
+ * 自定义 StreamingChatLanguageModel，对接 OpenAI 兼容 SSE 流式输出。
  */
 @Slf4j
 public class PackyCodeStreamingChatModel implements StreamingChatLanguageModel {
@@ -30,6 +30,8 @@ public class PackyCodeStreamingChatModel implements StreamingChatLanguageModel {
     private final String apiKey;
     private final String modelName;
     private final Double temperature;
+    private final String reasoningEffort;
+    private final String thinkingType;
     private final Duration timeout;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
@@ -39,11 +41,14 @@ public class PackyCodeStreamingChatModel implements StreamingChatLanguageModel {
      */
     @Builder
     public PackyCodeStreamingChatModel(String baseUrl, String apiKey, String modelName,
-                                        Double temperature, Duration timeout) {
+                                        Double temperature, String reasoningEffort, String thinkingType,
+                                        Duration timeout) {
         this.baseUrl = ValidationUtils.ensureNotNull(baseUrl, "baseUrl");
         this.apiKey = ValidationUtils.ensureNotNull(apiKey, "apiKey");
         this.modelName = ValidationUtils.ensureNotNull(modelName, "modelName");
         this.temperature = temperature;
+        this.reasoningEffort = reasoningEffort == null ? "" : reasoningEffort;
+        this.thinkingType = thinkingType == null ? "" : thinkingType;
         this.timeout = timeout != null ? timeout : Duration.ofSeconds(120);
         this.objectMapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
@@ -52,7 +57,7 @@ public class PackyCodeStreamingChatModel implements StreamingChatLanguageModel {
     }
 
     /**
-     * 通过 packycode SSE 接口发起流式对话请求。
+     * 通过 OpenAI 兼容 SSE 接口发起流式对话请求。
      */
     @Override
     public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
@@ -60,7 +65,7 @@ public class PackyCodeStreamingChatModel implements StreamingChatLanguageModel {
     }
 
     /**
-     * 通过 packycode SSE 接口发起支持工具调用的流式对话请求。
+     * 通过 OpenAI 兼容 SSE 接口发起支持工具调用的流式对话请求。
      */
     @Override
     public void generate(
@@ -70,7 +75,7 @@ public class PackyCodeStreamingChatModel implements StreamingChatLanguageModel {
     ) {
         try {
             String requestBody = OpenAiProtocolSupport.buildRequestBody(
-                objectMapper, modelName, temperature, messages, toolSpecifications
+                objectMapper, modelName, temperature, reasoningEffort, thinkingType, messages, toolSpecifications
             );
             log.debug("Streaming request body: {}", requestBody);
 

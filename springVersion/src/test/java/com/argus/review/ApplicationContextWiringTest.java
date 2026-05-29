@@ -1,8 +1,10 @@
 package com.argus.review;
 
 import com.argus.review.domain.agent.LogicAgent;
+import com.argus.review.domain.agent.FixAgent;
 import com.argus.review.domain.agent.SecurityAgent;
 import com.argus.review.domain.agent.StyleAgent;
+import com.argus.review.domain.tool.FileContentTool;
 import com.argus.review.domain.tool.GitDiffTool;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,16 +31,24 @@ class ApplicationContextWiringTest {
     private LogicAgent logicAgent;
 
     @Autowired
+    private FixAgent fixAgent;
+
+    @Autowired
     private GitDiffTool gitDiffTool;
 
+    @Autowired
+    private FileContentTool fileContentTool;
+
     /**
-     * Agent 与 GitDiffTool 必须能同时装配，防止 @AiService tools 配置漂移。
+     * Agent 与工具必须能同时装配，防止 @AiService tools 配置漂移。
      */
     @Test
     void shouldWireAgentsWithGitDiffTool() {
         assertNotNull(securityAgent);
         assertNotNull(styleAgent);
         assertNotNull(logicAgent);
+        assertNotNull(fixAgent);
         assertNotNull(gitDiffTool);
+        assertNotNull(fileContentTool);
     }
 }

@@ -1,0 +1,5 @@
+{
+  "projectId": "local/demo",
+  "mrId": "2",
+  "codeDiff": "diff --git a/src/main/java/com/demo/UserController.java b/src/main/java/com/demo/UserController.java\n@@\n+ @PostMapping(\"/users/search\")\n+ public List<User> search(@RequestParam String name) {\n+     String sql = \"SELECT * FROM users WHERE name = '\" + name + \"'\";\n+     return jdbcTemplate.query(sql, userMapper);\n+ }\n+\n+ @PostMapping(\"/users/{id}/role\")\n+ public void updateRole(@PathVariable Long id, @RequestBody RoleRequest request) {\n+     User user = userRepository.findById(id).get();\n+     user.setRole(request.role());\n+     userRepository.save(user);\n+ }\n+\n+ @GetMapping(\"/users/export\")\n+ public String exportUsers() {\n+     return userRepository.findAll().toString();\n+ }\ndiff --git a/src/test/java/com/demo/UserControllerTest.java b/src/test/java/com/demo/UserControllerTest.java\n@@\n+ @Test\n+ void searchUsers() {\n+     assertThat(controller.search(\"alice\")).isNotEmpty();\n+ }"
+}

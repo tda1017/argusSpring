@@ -1,0 +1,6 @@
+id,http_code,ttfb_seconds,total_seconds
+1,200,64.875328,64.875464
+2,200,80.985543,80.985643
+3,200,107.864462,107.864570
+
+summary: count=3 failed=0 throughput=0.01 req/s avg_ttfb=84.575s p50_ttfb=80.986s p95_ttfb=107.864s max_ttfb=107.864s avg_total=84.575s p50_total=80.986s p95_total=107.865s max_total=107.865s

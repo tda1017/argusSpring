@@ -1,0 +1,5 @@
+2026-03-10T10:00:00Z Running tests
+2026-03-10T10:00:01Z Traceback (most recent call last):
+2026-03-10T10:00:01Z   File "/workspace/app/main.py", line 12, in <module>
+2026-03-10T10:00:01Z     from requests_cache import CachedSession
+2026-03-10T10:00:01Z ModuleNotFoundError: No module named 'requests_cache'

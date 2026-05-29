@@ -1,6 +1,9 @@
 package com.argus.review.application.service;
 
 import com.argus.review.domain.agent.LogicAgent;
+import com.argus.review.domain.agent.FixAgent;
+import com.argus.review.domain.agent.AgentRole;
+import com.argus.review.domain.agent.OrchestratorAgent;
 import com.argus.review.domain.agent.SecurityAgent;
 import com.argus.review.domain.agent.StyleAgent;
 import com.argus.review.domain.rag.RetrievalService;
@@ -23,10 +26,12 @@ class ReviewApplicationServiceTest {
     private final StubSecurityAgent securityAgent = new StubSecurityAgent();
     private final StubStyleAgent styleAgent = new StubStyleAgent();
     private final StubLogicAgent logicAgent = new StubLogicAgent();
+    private final StubFixAgent fixAgent = new StubFixAgent();
+    private final OrchestratorAgent orchestratorAgent = new OrchestratorAgent();
     private final StubRetrievalService retrievalService = new StubRetrievalService();
 
     private final ReviewApplicationService service = new ReviewApplicationService(
-        securityAgent, styleAgent, logicAgent, retrievalService
+        securityAgent, styleAgent, logicAgent, fixAgent, orchestratorAgent, retrievalService
     );
 
     @AfterEach
@@ -71,6 +76,75 @@ class ReviewApplicationServiceTest {
         assertEquals("sec", result.securityReport());
         assertEquals("style", result.styleReport());
         assertEquals("logic", result.logicReport());
+    }
+
+    /**
+     * 验证自动修复会把 Diff、审查报告和 RAG 上下文交给 FixAgent。
+     */
+    @Test
+    void shouldGenerateFixPatch() {
+        fixAgent.patch = "diff --git a/App.java b/App.java";
+
+        var result = service.fix(new com.argus.review.application.port.in.ReviewUseCase.FixCommand(
+            "owner/repo",
+            "7",
+            "diff",
+            "review"
+        ));
+
+        assertEquals("diff --git a/App.java b/App.java", result.patch());
+        assertEquals("owner/repo", fixAgent.projectId);
+        assertEquals("7", fixAgent.mrId);
+        assertEquals("diff", fixAgent.codeDiff);
+        assertEquals("review", fixAgent.reviewReport);
+        assertEquals("ctx", fixAgent.context);
+    }
+
+    /**
+     * 验证安全 Agent 发现问题后会通过消息路由给 FixAgent。
+     */
+    @Test
+    void shouldRouteSecurityFindingToFixAgent() {
+        securityAgent.reviewResult = "HIGH: SQL 注入风险";
+        styleAgent.reviewResult = "style";
+        logicAgent.reviewResult = "logic";
+        fixAgent.patch = "diff --git a/UserRepo.java b/UserRepo.java";
+
+        var result = service.reviewOrchestrated(
+            new com.argus.review.application.port.in.ReviewUseCase.OrchestratedReviewCommand(
+                "owner/repo",
+                "9",
+                "diff"
+            )
+        );
+
+        assertEquals("HIGH: SQL 注入风险", result.reviewResult().securityReport());
+        assertEquals("diff --git a/UserRepo.java b/UserRepo.java", result.securityFix().patch());
+        assertEquals(2, result.messages().size());
+        assertEquals(AgentRole.SECURITY, result.messages().get(0).from());
+        assertEquals(AgentRole.FIX, result.messages().get(0).to());
+        assertEquals("HIGH: SQL 注入风险", fixAgent.reviewReport);
+        assertEquals(1, fixAgent.callCount);
+    }
+
+    /**
+     * 验证无安全问题时不会浪费一次 FixAgent 调用。
+     */
+    @Test
+    void shouldSkipFixAgentWhenNoSecurityFinding() {
+        securityAgent.reviewResult = "未发现安全问题";
+
+        var result = service.reviewOrchestrated(
+            new com.argus.review.application.port.in.ReviewUseCase.OrchestratedReviewCommand(
+                "owner/repo",
+                "9",
+                "diff"
+            )
+        );
+
+        assertEquals("", result.securityFix().patch());
+        assertEquals(0, result.messages().size());
+        assertEquals(0, fixAgent.callCount);
     }
 
     /**
@@ -138,6 +212,28 @@ class ReviewApplicationServiceTest {
         @Override
         public TokenStream reviewStream(String codeDiff, String context) {
             return super.reviewStream(codeDiff, context);
+        }
+    }
+
+    private static final class StubFixAgent implements FixAgent {
+
+        String patch = "";
+        String projectId = "";
+        String mrId = "";
+        String codeDiff = "";
+        String reviewReport = "";
+        String context = "";
+        int callCount = 0;
+
+        @Override
+        public String generatePatch(String projectId, String mrId, String codeDiff, String reviewReport, String context) {
+            callCount++;
+            this.projectId = projectId;
+            this.mrId = mrId;
+            this.codeDiff = codeDiff;
+            this.reviewReport = reviewReport;
+            this.context = context;
+            return patch;
         }
     }
 

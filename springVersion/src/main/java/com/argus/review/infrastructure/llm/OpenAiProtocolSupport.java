@@ -42,12 +42,32 @@ final class OpenAiProtocolSupport {
         List<ChatMessage> messages,
         List<ToolSpecification> toolSpecifications
     ) {
+        return buildRequestBody(objectMapper, modelName, temperature, "", "", messages, toolSpecifications);
+    }
+
+    static String buildRequestBody(
+        ObjectMapper objectMapper,
+        String modelName,
+        Double temperature,
+        String reasoningEffort,
+        String thinkingType,
+        List<ChatMessage> messages,
+        List<ToolSpecification> toolSpecifications
+    ) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("model", modelName);
         root.put("stream", true);
         // gpt-5.4 等 reasoning 模型通常不支持 temperature 参数。
         if (temperature != null && !modelName.contains("gpt-5")) {
             root.put("temperature", temperature);
+        }
+        // DeepSeek V4 Pro 官方示例使用 thinking + reasoning_effort 控制思考强度。
+        if (reasoningEffort != null && !reasoningEffort.isBlank()) {
+            root.put("reasoning_effort", reasoningEffort);
+        }
+        if (thinkingType != null && !thinkingType.isBlank()) {
+            ObjectNode thinking = root.putObject("thinking");
+            thinking.put("type", thinkingType);
         }
 
         ArrayNode messageNodes = root.putArray("messages");

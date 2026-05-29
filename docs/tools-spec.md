@@ -167,19 +167,129 @@ returns: list[{type: string, message: string, file: string, line: int}]
 
 ## 工具与 Agent 的映射
 
-| 工具 | Review Agent | CI/CD Agent | Orchestrator |
-|------|:-----------:|:-----------:|:------------:|
-| get_pr_diff | ✅ | - | - |
-| get_file_content | ✅ | ✅ | - |
-| get_build_log | - | ✅ | - |
-| create_pr_comment | - | - | ✅ (内部调用) |
-| create_review_comment | - | - | ✅ (内部调用) |
-| search_codebase | ✅ | - | - |
-| get_project_rules | ✅ | - | - |
-| search_solutions | - | ✅ | - |
-| parse_error_trace | - | ✅ | - |
+| 工具 | Review Agent | CI/CD Agent | Fix Agent | ConversationAgent | Orchestrator |
+|------|:-----------:|:-----------:|:---------:|:-----------------:|:------------:|
+| get_pr_diff | ✅ | - | - | - | - |
+| get_file_content | ✅ | ✅ | ✅ | - | - |
+| get_build_log | - | ✅ | - | - | - |
+| create_pr_comment | - | - | - | - | ✅ (内部调用) |
+| create_review_comment | - | - | - | - | ✅ (内部调用) |
+| search_codebase | ✅ | - | ✅ | - | - |
+| get_project_rules | ✅ | - | - | - | - |
+| search_solutions | - | ✅ | - | - | - |
+| parse_error_trace | - | ✅ | - | - | - |
+| review | - | - | - | ✅ | - |
+| diagnose | - | - | - | ✅ | - |
+| fix | - | - | - | ✅ | - |
+| get_git_context | - | - | - | ✅ | - |
+| get_pr_info | - | - | - | ✅ | - |
+| get_ci_status | - | - | - | ✅ | - |
 
-Orchestrator 不暴露工具给 LLM（它不用 LLM），而是在代码中直接调用 `create_pr_comment`。
+- Orchestrator 不暴露工具给 LLM（它不用 LLM），而是在代码中直接调用 `create_pr_comment`。
+- ConversationAgent 的工具是**高层编排工具**（调用子 Agent），不直接操作 GitHub API。
+- Fix Agent 需要读取文件内容和搜索代码库来生成精确的修复补丁。
+
+### ConversationAgent 专用工具
+
+以下工具仅由 ConversationAgent 使用，用于编排子 Agent 和获取本地上下文。
+
+#### `review`
+
+```python
+name: "review"
+description: "调用 Review Agent 审查代码变更"
+parameters:
+  diff: string           # unified diff 内容
+  rules: string | null   # 项目规范 (来自 argus.md)
+returns: ReviewOutput    # 结构化审查结果
+```
+
+#### `diagnose`
+
+```python
+name: "diagnose"
+description: "调用 CI/CD Agent 分析构建日志"
+parameters:
+  log: string            # 构建日志内容
+returns: CICDOutput      # 结构化诊断结果
+```
+
+#### `fix`
+
+```python
+name: "fix"
+description: "调用 Fix Agent 基于诊断结果生成修复补丁"
+parameters:
+  diagnosis: object      # ReviewOutput 或 CICDOutput
+  file_paths: list[string] | null  # 需要修复的文件路径（可选）
+returns: FixOutput       # 修复补丁列表
+```
+
+#### `get_git_context`
+
+```python
+name: "get_git_context"
+description: "获取当前 git 仓库状态：分支、暂存区变更、最近提交"
+parameters: {}
+returns:
+  repo_root: string
+  branch: string
+  staged_diff: string | null
+  recent_commits: list[string]
+  has_uncommitted: bool
+```
+
+实现：纯 git 命令调用，不需要 LLM。
+
+#### `get_pr_info`
+
+```python
+name: "get_pr_info"
+description: "获取当前分支对应的 PR 信息（标题、描述、diff）"
+parameters:
+  repo: string | null     # 不填则从 git remote 推断
+  pr_number: int | null   # 不填则根据当前分支查找
+returns:
+  pr_number: int
+  title: string
+  body: string
+  diff: string
+  state: string
+  checks_status: string
+```
+
+#### `get_ci_status`
+
+```python
+name: "get_ci_status"
+description: "获取 CI/CD 构建状态，如果有失败则返回日志摘要"
+parameters:
+  repo: string | null
+  pr_number: int | null
+returns:
+  status: string          # "success" | "failure" | "pending" | "none"
+  failed_jobs: list[{name: string, log_excerpt: string}] | null
+  run_url: string | null
+```
+
+### Fix Agent 专用工具
+
+Fix Agent 复用 `get_file_content` 和 `search_codebase`（已在上方定义），另有一个输出工具：
+
+#### `apply_patch`
+
+```python
+name: "apply_patch"
+description: "将生成的修复补丁应用到文件"
+parameters:
+  patches: list[{path: string, original: string, patched: string}]
+  dry_run: bool           # true 则只预览不实际修改
+returns:
+  applied: list[string]   # 成功应用的文件路径
+  failed: list[{path: string, reason: string}]
+```
+
+**注意**: 在 REPL 模式下，`apply_patch` 默认 `dry_run=true`，展示预览后需要用户确认才实际应用。
 
 ## GitHub App 认证
 

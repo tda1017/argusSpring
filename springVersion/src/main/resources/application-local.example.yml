@@ -1,0 +1,11 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key: sk-your-deepseek-key
+    streaming-chat-model:
+      api-key: sk-your-deepseek-key

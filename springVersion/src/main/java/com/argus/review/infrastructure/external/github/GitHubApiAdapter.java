@@ -73,6 +73,35 @@ public class GitHubApiAdapter implements GitHubPort {
     }
 
     /**
+     * 拉取仓库文件的原始文本内容。
+     */
+    @Override
+    public Mono<String> fetchFileContent(String owner, String repo, String path, String ref) {
+        log.info("[GitHub] Fetching file content: {}/{}/{}@{}", owner, repo, path, ref);
+        return webClient.get()
+            .uri(uriBuilder -> {
+                var builder = uriBuilder.pathSegment("repos", owner, repo, "contents");
+                for (String segment : path.split("/")) {
+                    if (!segment.isBlank()) {
+                        builder.pathSegment(segment);
+                    }
+                }
+                if (ref != null && !ref.isBlank()) {
+                    builder.queryParam("ref", ref);
+                }
+                return builder.build();
+            })
+            .header(HttpHeaders.ACCEPT, "application/vnd.github.raw")
+            .retrieve()
+            .bodyToMono(String.class)
+            .doOnNext(content -> log.debug("[GitHub] File content length: {} chars", content.length()))
+            .onErrorResume(e -> {
+                log.error("[GitHub] Failed to fetch file content", e);
+                return Mono.error(new RuntimeException("无法获取文件内容: " + e.getMessage(), e));
+            });
+    }
+
+    /**
      * 在 PR 对应的 Issue 线程下发布评论。
      */
     @Override

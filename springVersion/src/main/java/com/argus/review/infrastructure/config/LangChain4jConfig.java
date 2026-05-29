@@ -22,8 +22,7 @@ import java.time.Duration;
 
 /**
  * LangChain4j 基础设施配置。
- * <p>使用自定义 PackyCodeChatModel 替代原生 OpenAiChatModel，
- * 以兼容 packycode 强制 SSE 输出的 gpt-5.4 模型。</p>
+ * <p>使用自定义 OpenAI 兼容客户端，以兼容 DeepSeek / packycode 的 SSE 输出。</p>
  */
 @Configuration
 public class LangChain4jConfig {
@@ -34,11 +33,17 @@ public class LangChain4jConfig {
     @Value("${langchain4j.open-ai.chat-model.api-key:}")
     private String apiKey;
 
-    @Value("${langchain4j.open-ai.chat-model.model-name:gpt-5.4}")
+    @Value("${langchain4j.open-ai.chat-model.model-name:deepseek-v4-pro}")
     private String modelName;
 
     @Value("${langchain4j.open-ai.chat-model.temperature:0.2}")
     private Double temperature;
+
+    @Value("${langchain4j.open-ai.chat-model.reasoning-effort:}")
+    private String reasoningEffort;
+
+    @Value("${langchain4j.open-ai.chat-model.thinking-type:}")
+    private String thinkingType;
 
     @Value("${argus.rag.milvus.host:localhost}")
     private String milvusHost;
@@ -83,6 +88,8 @@ public class LangChain4jConfig {
             .apiKey(apiKey)
             .modelName(modelName)
             .temperature(temperature)
+            .reasoningEffort(reasoningEffort)
+            .thinkingType(thinkingType)
             .timeout(Duration.ofSeconds(60))
             .build();
     }
@@ -97,6 +104,8 @@ public class LangChain4jConfig {
             .apiKey(apiKey)
             .modelName(modelName)
             .temperature(temperature)
+            .reasoningEffort(reasoningEffort)
+            .thinkingType(thinkingType)
             .timeout(Duration.ofSeconds(120))
             .build();
     }

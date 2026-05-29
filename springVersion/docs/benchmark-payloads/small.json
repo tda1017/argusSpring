@@ -1,0 +1,5 @@
+{
+  "projectId": "local/demo",
+  "mrId": "1",
+  "codeDiff": "+ public void processUserInput(String input) {\n+     String sql = \"SELECT * FROM users WHERE name = '\" + input + \"'\";\n+     jdbcTemplate.execute(sql);\n+ }"
+}

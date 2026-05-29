@@ -39,11 +39,30 @@
 
 ### F-05: 自定义 LLM 适配层
 
-PackyCodeChatModel / PackyCodeStreamingChatModel 自定义实现 LangChain4j ChatLanguageModel 接口，兼容 packycode 强制 SSE 输出的 gpt-5.4 模型。通过 Java HttpClient 直接调用并逐行解析 SSE。
+PackyCodeChatModel / PackyCodeStreamingChatModel 自定义实现 LangChain4j ChatLanguageModel 接口，兼容 DeepSeek 与 packycode 的 OpenAI Chat Completions SSE 输出。通过 Java HttpClient 直接调用并逐行解析 SSE，DeepSeek V4 Pro 可配置 `thinking` 与 `reasoning_effort`。
 
 ### F-06: LangChain4j AiService 声明式 Agent
 
 三个审查 Agent 均通过 `@AiService` 注解声明，SystemMessage 定义专家 Persona，UserMessage 模板注入 codeDiff 和 context 变量。Spring Boot 自动装配。
+
+### F-07: FixAgent 自动修复建议
+
+基于代码 Diff、审查报告和 RAG 上下文生成 unified diff patch。
+
+- `FixAgent` 通过 `@AiService` 声明
+- 只使用调用方提供的 Diff 和审查报告，不在修复阶段重新拉取外部 PR
+- `POST /api/v1/review/fix` 返回可用于 `git apply` 的 patch 文本
+- 只修复审查报告明确指出的问题，不做无关重构
+
+### F-08: Agent 链式协同
+
+在并行审查后引入确定性 Orchestrator 路由。
+
+- `SecurityAgent` 输出安全报告
+- `OrchestratorAgent` 判断是否存在可修复安全问题
+- 存在问题时发送 `Security -> Fix` 消息
+- `FixAgent` 基于安全报告生成修复 patch
+- `POST /api/v1/review/orchestrated` 返回审查结果、修复结果和消息记录
 
 ## User Stories
 
@@ -60,6 +79,8 @@ PackyCodeChatModel / PackyCodeStreamingChatModel 自定义实现 LangChain4j Cha
 - [ ] Webhook 签名验证失败返回 401，不触发审查
 - [ ] 同步接口返回包含 securityReport / styleReport / logicReport 三个字段的 JSON
 - [ ] 流式接口返回 SSE 格式，每行带 Agent 标签前缀
+- [ ] 自动修复接口返回 unified diff patch
+- [ ] 链式协同接口返回 Agent 消息路由记录
 - [ ] RAG 检索无匹配时返回 "暂无相关内部规范" 而非报错
 - [ ] 本地 Embedding 模型无需外部 API Key 即可运行
 - [ ] 审查报告自动回写为 PR Comment，格式为 Markdown

@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "argus"
+version = "0.2.0"
+description = "Interactive AI code review and DevOps assistant"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "anthropic>=0.49.0",
+  "click>=8.1.8",
+  "fastapi>=0.115.12",
+  "httpx>=0.28.1",
+  "openai>=1.66.0",
+  "prompt_toolkit>=3.0.47",
+  "pydantic>=2.11.1",
+  "pydantic-settings>=2.8.1",
+  "pyjwt>=2.10.1",
+  "rich>=13.9.4",
+  "uvicorn>=0.34.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.5",
+  "pytest-asyncio>=0.25.3",
+]
+
+[project.scripts]
+argus = "argus.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["argus"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -28,6 +28,17 @@ public interface GitHubPort {
     Mono<String> fetchCommitDiff(String owner, String repo, String commitSha);
 
     /**
+     * 获取仓库中文件的原始内容。
+     *
+     * @param owner 仓库所有者
+     * @param repo  仓库名
+     * @param path  文件路径
+     * @param ref   分支、标签或 Commit SHA；可为空
+     * @return 文件文本内容
+     */
+    Mono<String> fetchFileContent(String owner, String repo, String path, String ref);
+
+    /**
      * 在 Pull Request 下发表评论。
      *
      * @param owner      仓库所有者

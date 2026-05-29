@@ -84,11 +84,15 @@
 ### 1. ReviewController（接口层）
 
 ```
-POST /api/v1/review/sync   → ReviewResult (JSON)
+POST /api/v1/review/sync    → ReviewResult (JSON)
 POST /api/v1/review/stream  → Flux<String> (SSE)
+POST /api/v1/review/fix     → FixResult (JSON)
+POST /api/v1/review/orchestrated → OrchestratedReviewResult (JSON)
 ```
 
-请求体：`ReviewRequest(projectId, mrId, codeDiff)`
+审查请求体：`ReviewRequest(projectId, mrId, codeDiff)`
+
+修复请求体：`FixRequest(projectId, mrId, codeDiff, reviewReport)`
 
 ### 2. GitHubWebhookController（接口层）
 
@@ -117,6 +121,14 @@ reviewStream(codeDiff):
   1. RAG 检索上下文
   2. 三个 Agent 各自 subscribeOn(boundedElastic)
   3. Flux.merge() 合并三路流，带标签前缀
+
+// 链式协同模式
+reviewOrchestrated(command):
+  1. RAG 检索上下文
+  2. Security/Style/Logic 三路并行审查
+  3. OrchestratorAgent 判断 Security 输出是否需要修复
+  4. 需要修复时发送 Security -> Fix 消息
+  5. FixAgent 生成 securityFix patch
 ```
 
 ### 4. GitHubReviewService（应用层）
@@ -134,6 +146,8 @@ interface CodeReviewAgent {
 SecurityAgent extends CodeReviewAgent  // OWASP Top 10
 StyleAgent extends CodeReviewAgent     // 命名/结构/SOLID
 LogicAgent extends CodeReviewAgent     // 业务正确性/并发
+FixAgent.generatePatch(...)            // unified diff patch
+OrchestratorAgent.routeSecurityFindings(...) // Security -> Fix 路由
 ```
 
 每个 Agent 通过 `@SystemMessage` 定义专家 Persona，`@UserMessage` 模板注入变量。
@@ -147,12 +161,12 @@ retrieveRelevantContext(query, maxResults=3, minScore=0.7):
   3. 拼接匹配片段，附带相似度分数
 ```
 
-### 7. PackyCodeChatModel（基础设施层）
+### 7. OpenAI 兼容 ChatModel（基础设施层）
 
-自定义 LLM 客户端，解决 packycode gpt-5.4 强制 SSE 输出问题：
+自定义 LLM 客户端，对接 DeepSeek / packycode 的 OpenAI Chat Completions SSE 输出：
 - `buildRequestBody()` — 构建 OpenAI 兼容请求，强制 `stream=true`
 - `parseSseResponse()` — 逐行解析 `data:` 前缀 SSE 事件，拼接 content delta
-- reasoning 模型跳过 temperature 参数
+- DeepSeek V4 Pro 支持 `thinking` 与 `reasoning_effort`
 
 ## Data Models
 
@@ -166,9 +180,17 @@ record ReviewRequest(String projectId, String mrId, String codeDiff)
 record ReviewResult(String securityReport, String styleReport, String logicReport)
 ```
 
+### FixRequest / FixResult（入站 / 出站）
+```java
+record FixRequest(String projectId, String mrId, String codeDiff, String reviewReport)
+record FixResult(String patch)
+record OrchestratedReviewResult(ReviewResult reviewResult, FixResult securityFix, List<AgentMessage> messages)
+```
+
 ### GitHubPort 接口
 ```java
 Mono<String> fetchPrDiff(owner, repo, prNumber)
+Mono<String> fetchFileContent(owner, repo, path, ref)
 Mono<Long> postPrComment(owner, repo, prNumber, body)
 ```
 

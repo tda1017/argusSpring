@@ -133,3 +133,25 @@ A: 事件类型有限且确定，用规则路由延迟低、成本零、100% 可
 
 **Q: 如果要加新的 Agent（比如安全扫描 Agent），改动大吗？**
 A: 只需要在 Orchestrator 的路由规则里加一条，再注册新 Agent 实例。现有 Agent 零改动。这就是 Orchestrator 模式的价值——集中管理调度策略。
+
+## 与 ConversationAgent 的关系
+
+Orchestrator 和 ConversationAgent 是**两个平行的入口编排器**，共享同一套底层 Agent（Review Agent、CI/CD Agent、Fix Agent）。
+
+```
+路径 1: 用户终端 → REPL → ConversationAgent → Review / CI/CD / Fix Agent
+路径 2: GitHub Webhook → Gateway → Orchestrator → Review / CI/CD / Fix Agent
+```
+
+| 维度 | Orchestrator | ConversationAgent |
+|------|-------------|-------------------|
+| 入口 | GitHub Webhook | 用户终端 REPL |
+| 输入 | 结构化事件 (GitHubEvent) | 自然语言 + 斜杠命令 |
+| 路由方式 | 确定性 if/else 规则 | LLM 意图理解 |
+| 是否需要 LLM | 否 | 是 |
+| 会话状态 | 无状态 | 多轮对话 |
+| 输出目标 | GitHub PR Comment | 终端流式输出 |
+
+**为什么不合并？** 职责完全不同。Orchestrator 处理结构化 Webhook 事件，用 if/else 就够了，加 LLM 是多余的。ConversationAgent 处理自然语言，必须用 LLM。合并只会让简单的事情变复杂。
+
+详见 [conversation-agent.md](conversation-agent.md)。

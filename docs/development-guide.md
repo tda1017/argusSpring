@@ -117,12 +117,22 @@ python -m argus review --diff-file ./test.diff
 # 3. 输出格式正确
 ```
 
+### Step 1.7: 噪音过滤器
+
+参考 `user-experience.md` 第二节，实现 ReviewPostFilter：
+- 严重性阈值过滤（默认只发 critical + warning）
+- 每文件上限 3 条
+- 每 PR 上限 8 条
+- 支持 argus.md 中自定义阈值
+
 ### Phase 1 交付检查清单
 
 - [ ] Agent 基类实现，支持 tool calling loop
 - [ ] Diff 解析器，覆盖常见 diff 格式
 - [ ] Review Agent 能分析 diff 并输出结构化审查意见
-- [ ] CLI 可用
+- [ ] 噪音过滤器（严重性阈值 + 数量上限）
+- [ ] CLI 可用（`git diff | argus review`）
+- [ ] --verbose 模式显示 trace 信息
 - [ ] 基础测试通过
 
 ---
@@ -168,19 +178,217 @@ def parse_error_trace(log_text: str, language: str) -> list[ErrorTrace]
 
 ---
 
-## Phase 3: Orchestrator + GitHub 集成
+## Phase 3: Conversation Agent + REPL
 
 ### 目标
-串联 Review Agent 和 CI/CD Agent，通过 GitHub App 接入真实 repo。
+交互式入口。用户输入 `argus` 进入持续会话，支持自然语言交互、斜杠命令、多轮对话、流式输出。ConversationAgent 作为顶层对话 Agent，将 Review Agent 和 CI/CD Agent 作为工具调用。
 
-### Step 3.1: GitHub App 设置
+### Step 3.1: REPL 骨架
+
+使用 prompt_toolkit 构建 REPL 基础框架：
+
+```python
+# src/repl/session.py
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import FileHistory
+
+async def start_repl():
+    session = PromptSession(
+        history=FileHistory(".argus_history"),
+        message="argus> ",
+    )
+    context = await detect_context()  # git/PR/CI 自动检测
+    print_welcome(context)
+
+    while True:
+        try:
+            user_input = await session.prompt_async()
+            await process_input(user_input, context)
+        except KeyboardInterrupt:
+            continue
+        except EOFError:
+            break
+```
+
+交付:
+- prompt_toolkit 基础 REPL
+- 输入历史持久化 (.argus_history)
+- Ctrl+C 中断当前操作，Ctrl+D 退出
+
+### Step 3.2: 自动上下文检测
+
+```python
+# src/repl/context.py
+async def detect_context() -> Session:
+    """启动时自动检测 git/PR/CI 上下文"""
+    # 1. git repo root, branch
+    # 2. 通过 gh CLI 检测关联 PR
+    # 3. 获取 CI 状态
+    # 4. 检查 argus.md 是否存在
+```
+
+交付:
+- git 仓库检测
+- 当前分支、PR 关联检测
+- CI 状态检测
+- 欢迎信息展示检测结果
+
+### Step 3.3: ConversationAgent 实现
+
+参考 `conversation-agent.md`：
+
+```python
+# src/agents/conversation.py
+class ConversationAgent(BaseAgent):
+    """
+    LLM 驱动的对话编排器
+    - system prompt: 交互式代码审查助手
+    - tools: review, diagnose, fix, get_git_context, get_pr_info, get_ci_status
+    - 多轮对话: 维护 session.messages
+    """
+```
+
+交付:
+- ConversationAgent 类实现
+- system prompt 定义
+- 工具注册（review、diagnose、fix、get_git_context、get_pr_info、get_ci_status）
+- 多轮对话上下文管理
+
+### Step 3.4: 流式输出
+
+```python
+# src/repl/renderer.py
+# 使用 rich 库渲染:
+# - Markdown 格式化
+# - 代码块语法高亮
+# - 工具调用 spinner
+# - 审查结果颜色区分
+```
+
+交付:
+- LLM streaming API 集成
+- rich 终端渲染
+- 工具调用期间显示 spinner
+
+### Step 3.5: 斜杠命令
+
+```python
+# src/repl/commands.py
+SLASH_COMMANDS = {
+    "/review": handle_review,      # 审查当前分支变更
+    "/diagnose": handle_diagnose,  # 分析 CI 失败
+    "/fix": handle_fix,            # 生成修复补丁
+    "/context": handle_context,    # 显示上下文
+    "/clear": handle_clear,        # 清除对话
+    "/help": handle_help,          # 显示帮助
+    "/exit": handle_exit,          # 退出
+}
+```
+
+交付:
+- 所有斜杠命令实现
+- `/review --staged` 等参数支持
+- Tab 补全
+
+### Phase 3 交付检查清单
+
+- [ ] REPL 基础框架 (prompt_toolkit)
+- [ ] 自动上下文检测 (git/PR/CI)
+- [ ] ConversationAgent 实现 (system prompt + tools + 多轮对话)
+- [ ] 流式输出 (streaming + rich 渲染)
+- [ ] 斜杠命令 (/review, /diagnose, /fix, /context, /clear, /help, /exit)
+- [ ] 测试 (conversation agent + REPL 集成)
+
+---
+
+## Phase 4: Fix Agent
+
+### 目标
+一个能基于 Review Agent 或 CI/CD Agent 的诊断结果，自动生成修复补丁的 Agent。
+
+### Step 4.1: Fix Agent 实现
+
+参考 `fix-agent.md`：
+- system prompt：精确修复，最小变更
+- 工具：get_file_content、search_codebase、apply_patch
+- 输入：诊断结果（ReviewOutput 或 CICDOutput）+ 文件上下文
+- 输出：FixOutput（patch 列表）
+
+### Step 4.2: Patch 生成与应用
+
+```python
+# Fix Agent 输出结构
+@dataclass
+class FilePatch:
+    path: str              # 文件路径
+    original: str          # 原始内容片段
+    patched: str           # 修复后内容
+    explanation: str       # 修复说明
+
+@dataclass
+class FixOutput:
+    patches: list[FilePatch]
+    summary: str           # 修复摘要
+    confidence: float      # 0-1 置信度
+```
+
+### Step 4.3: 验证流水线
+
+参考 `verification-pipeline.md`，在 patch 生成后、apply 前加入确定性验证：
+
+```python
+# verification/pipeline.py
+# Stage 1: ast.parse() 语法校验
+# Stage 2: 范围检查（行数/文件数/新增import限制）
+# Stage 3: AST 级公开 API 签名对比
+# Stage 4: ruff + mypy 静态分析
+# Stage 5: 隔离 worktree 中跑 pytest
+```
+
+交付:
+- 5 个验证阶段实现
+- 信任分级逻辑（auto_merge / suggest / comment_only / reject）
+- 隔离 worktree 执行环境
+- 修复类型白名单（允许/禁止自动修复的类型列表）
+
+### Step 4.4: REPL 集成
+
+- `/fix` 命令触发修复流程
+- 展示 diff 预览，用户确认后 apply
+- 支持逐个 patch 确认或全部 apply
+
+### Step 4.5: 测试
+
+- 基于 fixtures 中的已知问题测试修复质量
+- 验证 patch 可正确 apply
+- 验证不引入新问题
+
+### Phase 4 交付检查清单
+
+- [ ] Fix Agent 实现 (system prompt + tools)
+- [ ] Patch 生成 (结构化 FilePatch 输出)
+- [ ] 验证流水线 5 个 Stage (语法/范围/接口/lint/测试)
+- [ ] 信任分级 (auto_merge/suggest/comment_only/reject)
+- [ ] 隔离 worktree 执行环境
+- [ ] REPL 中的确认流程 (预览 → 确认 → apply)
+- [ ] CLI one-shot 模式支持 (`argus fix`)
+- [ ] 测试
+
+---
+
+## Phase 5: Orchestrator + GitHub 集成
+
+### 目标
+串联所有 Agent，通过 GitHub App 接入真实 repo。
+
+### Step 5.1: GitHub App 设置
 
 1. 在 GitHub 创建一个 GitHub App
 2. 权限: Pull Requests (read/write), Checks (read), Contents (read)
 3. 订阅事件: pull_request, check_run
 4. 生成 private key，配到 .env
 
-### Step 3.2: Webhook Gateway
+### Step 5.2: Webhook Gateway
 
 ```python
 # src/gateway/webhook.py
@@ -192,11 +400,11 @@ async def handle_webhook(request: Request):
     # 4. 交给 Orchestrator
 ```
 
-### Step 3.3: Orchestrator 实现
+### Step 5.3: Orchestrator 实现
 
 参考 `orchestrator-agent.md`，这是纯 Python 逻辑，不需要 LLM。
 
-### Step 3.4: 端到端测试
+### Step 5.4: 端到端测试
 
 ```bash
 # 用 ngrok 暴露本地服务
@@ -206,38 +414,48 @@ ngrok http 8000
 # 在测试 repo 上创建 PR，观察 Argus 是否自动评论
 ```
 
-### Phase 3 交付检查清单
+### Step 5.5: 增量审查 + 反馈
+
+参考 `user-experience.md`：
+- ReviewStateStore：记录已审查的 commit 和已发出的评论
+- 增量 diff 获取：只审查新 commit 引入的变更
+- 去重：同一问题不重复评论
+- 自动 resolve：用户修了代码后标记评论为已解决
+- Emoji 反馈收集：thumbsup/thumbsdown
+
+### Phase 5 交付检查清单
 
 - [ ] GitHub App 认证 (JWT + installation token)
 - [ ] Webhook 签名验证
 - [ ] Orchestrator 事件路由
 - [ ] 并行派发 Agent
 - [ ] 结果聚合 + 格式化
-- [ ] 发送 PR comment
+- [ ] 发送 PR comment（带 trace 折叠 + 反馈提示）
+- [ ] 增量审查（不重复评论）
 - [ ] 端到端测试通过
 
 ---
 
-## Phase 4: RAG 集成 + 评测
+## Phase 6: RAG 集成 + 评测
 
 ### 目标
 接入 RAG 子系统，提升审查质量。运行评测，收集量化指标。
 
-### Step 4.1: RAG 子系统
+### Step 6.1: RAG 子系统
 
 参考 `rag-pipeline.md`:
 1. 先实现 Dense 检索 (OpenAI embedding + Qdrant)
 2. 再加 BM25 + RRF 融合
 3. 最后加 Reranker
 
-### Step 4.2: 评测
+### Step 6.2: 评测
 
 参考 `metrics.md`:
 1. 构建评测数据集
 2. 跑评测脚本
 3. 收集指标
 
-### Phase 4 交付检查清单
+### Phase 6 交付检查清单
 
 - [ ] RAG 子系统可用 (至少 Dense 检索)
 - [ ] 代码库索引功能
@@ -257,6 +475,8 @@ ngrok http 8000
 | LLM SDK | anthropic | 0.40+ |
 | LLM SDK (备选) | openai | 1.50+ |
 | 数据校验 | pydantic | 2.0+ |
+| REPL | prompt_toolkit | 3.0+ |
+| 终端渲染 | rich | 13.0+ |
 | 向量库 | qdrant-client | 1.12+ |
 | Embedding | BAAI/bge-m3 或 OpenAI | |
 | Reranker | BAAI/bge-reranker-v2-m3 | |

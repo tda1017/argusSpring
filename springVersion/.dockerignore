@@ -1,0 +1,9 @@
+target/
+.m2/
+.git/
+.idea/
+*.iml
+*.log
+src/main/resources/application-local.yml
+reports/
+node_modules/

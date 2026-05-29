@@ -1,0 +1,13 @@
+diff --git a/src/auth.py b/src/auth.py
+index 1111111..2222222 100644
+--- a/src/auth.py
++++ b/src/auth.py
+@@ -10,2 +10,7 @@ def login(user_name):
+     query = "SELECT 1"
++    API_KEY = "super-secret"
++    query = f"SELECT * FROM users WHERE name = '{user_name}'"
++    cursor.execute(query)
++    except Exception:
++        pass
++    print("debug")
+     return query

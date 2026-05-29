@@ -1,6 +1,10 @@
 package com.argus.review.interfaces.web;
 
 import com.argus.review.application.port.in.ReviewUseCase;
+import com.argus.review.application.port.in.ReviewUseCase.FixCommand;
+import com.argus.review.application.port.in.ReviewUseCase.FixResult;
+import com.argus.review.application.port.in.ReviewUseCase.OrchestratedReviewCommand;
+import com.argus.review.application.port.in.ReviewUseCase.OrchestratedReviewResult;
 import com.argus.review.application.port.in.ReviewUseCase.ReviewResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -48,6 +52,33 @@ public class ReviewController {
     }
 
     /**
+     * 自动修复接口：基于 Diff 和审查报告生成 unified diff patch。
+     */
+    @PostMapping(value = "/fix", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public FixResult fix(@Valid @RequestBody FixRequest request) {
+        log.info("收到自动修复请求: project={}, mrId={}", request.projectId(), request.mrId());
+        return reviewUseCase.fix(new FixCommand(
+            request.projectId(),
+            request.mrId(),
+            request.codeDiff(),
+            request.reviewReport()
+        ));
+    }
+
+    /**
+     * 链式协同审查接口：审查 Agent 完成后由 Orchestrator 路由给 FixAgent。
+     */
+    @PostMapping(value = "/orchestrated", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public OrchestratedReviewResult reviewOrchestrated(@Valid @RequestBody ReviewRequest request) {
+        log.info("收到链式协同审查请求: project={}, mrId={}", request.projectId(), request.mrId());
+        return reviewUseCase.reviewOrchestrated(new OrchestratedReviewCommand(
+            request.projectId(),
+            request.mrId(),
+            request.codeDiff()
+        ));
+    }
+
+    /**
      * 审查请求 DTO。
      */
     public record ReviewRequest(
@@ -56,6 +87,17 @@ public class ReviewController {
         // 直接要求调用方传入 Diff，控制器不负责外部平台拉取逻辑。
         @NotBlank(message = "codeDiff 不能为空")
         String codeDiff
+    ) {}
+
+    /**
+     * 自动修复请求 DTO。
+     */
+    public record FixRequest(
+        String projectId,
+        String mrId,
+        @NotBlank(message = "codeDiff 不能为空")
+        String codeDiff,
+        String reviewReport
     ) {}
 
 }

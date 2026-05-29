@@ -1,17 +1,23 @@
 package com.argus.review.application.service;
 
 import com.argus.review.application.port.in.ReviewUseCase;
-import dev.langchain4j.service.TokenStream;
+import com.argus.review.domain.agent.FixAgent;
+import com.argus.review.domain.agent.AgentMessage;
+import com.argus.review.domain.agent.AgentRole;
 import com.argus.review.domain.agent.SecurityAgent;
 import com.argus.review.domain.agent.StyleAgent;
 import com.argus.review.domain.agent.LogicAgent;
+import com.argus.review.domain.agent.OrchestratorAgent;
 import com.argus.review.domain.rag.RetrievalService;
+import dev.langchain4j.service.TokenStream;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -27,6 +33,8 @@ public class ReviewApplicationService implements ReviewUseCase {
     private final SecurityAgent securityAgent;
     private final StyleAgent styleAgent;
     private final LogicAgent logicAgent;
+    private final FixAgent fixAgent;
+    private final OrchestratorAgent orchestratorAgent;
     private final RetrievalService retrievalService;
     // 每次审查彼此独立，使用虚拟线程并行执行三个 Agent，减少等待时间。
     private final ExecutorService reviewExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -40,7 +48,13 @@ public class ReviewApplicationService implements ReviewUseCase {
     @Override
     public ReviewResult review(String codeDiff) {
         String context = retrievalService.retrieveRelevantContext(codeDiff);
+        return reviewWithContext(codeDiff, context);
+    }
 
+    /**
+     * 用已有上下文执行三路并行审查。
+     */
+    private ReviewResult reviewWithContext(String codeDiff, String context) {
         // 三个维度互不依赖，直接并行跑，别写串行浪费时间。
         var securityFuture = java.util.concurrent.CompletableFuture.supplyAsync(
             () -> securityAgent.review(codeDiff, context), reviewExecutor
@@ -88,6 +102,60 @@ public class ReviewApplicationService implements ReviewUseCase {
     }
 
     /**
+     * 基于审查报告生成统一补丁。
+     *
+     * @param command 修复命令
+     * @return unified diff patch
+     */
+    @Override
+    public FixResult fix(FixCommand command) {
+        String context = retrievalService.retrieveRelevantContext(command.codeDiff());
+        String patch = fixAgent.generatePatch(
+            blankToEmpty(command.projectId()),
+            blankToEmpty(command.mrId()),
+            command.codeDiff(),
+            blankToEmpty(command.reviewReport()),
+            context
+        );
+        return new FixResult(patch);
+    }
+
+    /**
+     * 链式协同审查：审查先并行，安全问题再路由给 FixAgent。
+     *
+     * @param command 链式协同审查命令
+     * @return 审查结果、修复补丁和消息路由记录
+     */
+    @Override
+    public OrchestratedReviewResult reviewOrchestrated(OrchestratedReviewCommand command) {
+        String context = retrievalService.retrieveRelevantContext(command.codeDiff());
+        ReviewResult reviewResult = reviewWithContext(command.codeDiff(), context);
+        List<AgentMessage> messages = new ArrayList<>();
+
+        FixResult securityFix = orchestratorAgent.routeSecurityFindings(reviewResult.securityReport())
+            .map(message -> {
+                messages.add(message);
+                String patch = fixAgent.generatePatch(
+                    blankToEmpty(command.projectId()),
+                    blankToEmpty(command.mrId()),
+                    command.codeDiff(),
+                    message.payload(),
+                    context
+                );
+                messages.add(new AgentMessage(
+                    AgentRole.FIX,
+                    AgentRole.ORCHESTRATOR,
+                    "SECURITY_FIX_READY",
+                    patch
+                ));
+                return new FixResult(patch);
+            })
+            .orElseGet(() -> new FixResult(""));
+
+        return new OrchestratedReviewResult(reviewResult, securityFix, List.copyOf(messages));
+    }
+
+    /**
      * 将 LangChain4j TokenStream 转成 Reactor Flux。
      */
     private Flux<String> tokenStreamToFlux(String label, TokenStream tokenStream) {
@@ -107,6 +175,10 @@ public class ReviewApplicationService implements ReviewUseCase {
     @PreDestroy
     void shutdownExecutor() {
         reviewExecutor.shutdown();
+    }
+
+    private String blankToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
 }

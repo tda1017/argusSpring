@@ -1,0 +1,21 @@
+query,expected_source
+multi agent parallel review virtual threads,docs/specs/requirements.md
+security style logic agents review dimensions,docs/specs/requirements.md
+github webhook pull request signature verification,docs/specs/requirements.md
+rest api sync stream review endpoint,docs/specs/requirements.md
+rag retrieval top three min score embedding,docs/specs/requirements.md
+local bge embedding milvus vector store,docs/specs/requirements.md
+packycode sse chat model tool calling,docs/specs/requirements.md
+hexagonal architecture ports adapters github port,docs/specs/design.md
+review application service orchestration flow,docs/specs/design.md
+github review service fetch diff post comment,docs/specs/design.md
+retrieval service find relevant context process,docs/specs/design.md
+packycode chat model parse sse response,docs/specs/design.md
+review request review result data model,docs/specs/design.md
+webhook error handling unauthorized signature,docs/specs/design.md
+task langchain4j configuration chat model,docs/specs/tasks.md
+task security style logic ai services,docs/specs/tasks.md
+task git diff tool real api integration,docs/specs/tasks.md
+task review stream true streaming refactor,docs/specs/tasks.md
+task milvus vector store production profile,docs/specs/tasks.md
+task fix agent automatic patch suggestion,docs/specs/tasks.md

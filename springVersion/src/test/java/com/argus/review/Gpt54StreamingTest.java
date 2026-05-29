@@ -14,20 +14,22 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 验证 PackyCodeStreamingChatModel 能否正常接收 packycode 的 SSE 输出。
+ * 验证 OpenAI 兼容流式模型能否正常接收 DeepSeek SSE 输出。
  */
 @EnabledIfEnvironmentVariable(named = "ARGUS_RUN_LLM_TESTS", matches = "true")
-@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "DEEPSEEK_API_KEY", matches = ".+")
 class Gpt54StreamingTest {
 
     @Test
     void testStreaming() throws Exception {
-        String apiKey = System.getenv("OPENAI_API_KEY");
+        String apiKey = System.getenv("DEEPSEEK_API_KEY");
 
         PackyCodeStreamingChatModel model = PackyCodeStreamingChatModel.builder()
-            .baseUrl("https://www.packyapi.com/v1")
+            .baseUrl("https://api.deepseek.com")
             .apiKey(apiKey)
-            .modelName("gpt-5.4")
+            .modelName("deepseek-v4-pro")
+            .reasoningEffort("high")
+            .thinkingType("enabled")
             .build();
 
         List<ChatMessage> messages = List.of(

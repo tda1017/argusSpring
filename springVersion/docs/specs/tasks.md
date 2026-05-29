@@ -4,8 +4,8 @@
 
 - [x] 1. **基础设施层 — LLM 适配与配置**
     - [x] 1.1. PackyCodeChatModel 自定义 ChatLanguageModel 实现
-        - *Goal*: 兼容 packycode 强制 SSE 输出的 gpt-5.4 模型
-        - *Details*: Java HttpClient 直接调用 /v1/chat/completions，逐行解析 SSE data: 前缀事件，拼接 content delta；reasoning 模型跳过 temperature 参数；强制 stream=true
+        - *Goal*: 兼容 DeepSeek / packycode 的 OpenAI Chat Completions SSE 输出
+        - *Details*: Java HttpClient 直接调用 /chat/completions，逐行解析 SSE data: 前缀事件，拼接 content delta；支持 DeepSeek V4 Pro 的 thinking / reasoning_effort；强制 stream=true
         - *Requirements*: F-05
     - [x] 1.2. PackyCodeStreamingChatModel 流式实现
         - *Goal*: 支持 LangChain4j StreamingChatLanguageModel 接口的真流式输出
@@ -151,13 +151,13 @@
 - [x] 16. **性能基准脚本**
     - *Priority*: MEDIUM
     - *Goal*: TTFT、总耗时、并发吞吐用脚本测，不再写无依据数字
-    - *Details*: 新增 `scripts/benchmark-review.sh`，支持 `stream/sync`、请求数、并发数、外部 payload
+    - *Details*: 新增 `scripts/benchmark-review.sh`，支持 `stream/sync/orchestrated`、请求数、并发数、外部 payload、P50/P95、吞吐统计
     - *Requirements*: 非功能需求/性能
 
 - [x] 17. **真实 LLM 测试隔离**
     - *Priority*: HIGH
     - *Goal*: `mvn test` 不再默认访问真实 LLM 或本机私有配置
-    - *Details*: 真实 LLM 测试仅在 `ARGUS_RUN_LLM_TESTS=true` 且存在 `OPENAI_API_KEY` 时执行
+    - *Details*: 真实 LLM 测试仅在 `ARGUS_RUN_LLM_TESTS=true` 且存在 `DEEPSEEK_API_KEY` 时执行
     - *Affected files*: `LlmLinkVerificationTest.java`, `Gpt54StreamingTest.java`, `PackyCodeDebugTest.java`
     - *Requirements*: 测试稳定性
 
@@ -165,6 +165,34 @@
     - *Priority*: MEDIUM
     - *Goal*: `resume-vs-reality-analysis.md` 与当前代码同步
     - *Details*: 更新 `@Tool`、RAG 预加载、模型命名、剩余风险描述
+
+- [x] 19. **FixAgent 自动修复建议**
+    - *Priority*: HIGH
+    - *Goal*: 基于审查报告生成可应用的 unified diff patch
+    - *Details*: 新增 `FixAgent`、`FileContentTool`、`/api/v1/review/fix` 端点；修复阶段只使用已传入 Diff，避免 LLM 误调外部 PR 工具；扩展 `ReviewUseCase` 和 `GitHubPort`
+    - *Affected files*: `FixAgent.java`, `FileContentTool.java`, `ReviewUseCase.java`, `ReviewApplicationService.java`, `ReviewController.java`, `GitHubPort.java`, `GitHubApiAdapter.java`
+    - *Requirements*: F-07
+
+- [x] 20. **Agent 链式协同**
+    - *Priority*: HIGH
+    - *Goal*: 从并行聚合升级为 Security → Orchestrator → Fix 的链式执行
+    - *Details*: 新增 `AgentMessage`、`AgentRole`、`OrchestratorAgent`；新增 `/api/v1/review/orchestrated` 端点；安全问题存在时自动生成 securityFix patch
+    - *Affected files*: `AgentMessage.java`, `AgentRole.java`, `OrchestratorAgent.java`, `ReviewUseCase.java`, `ReviewApplicationService.java`, `ReviewController.java`
+    - *Requirements*: F-08
+
+- [x] 21. **RAG recall@3 评估入口**
+    - *Priority*: MEDIUM
+    - *Goal*: 用标注数据验证检索质量，不再空口写命中率
+    - *Details*: 新增 20 条 `query -> expected_source` 数据、`RagRetrievalEvaluationTest` 和 `scripts/evaluate-rag.sh`
+    - *Affected files*: `docs/rag-evaluation-dataset.csv`, `RagRetrievalEvaluationTest.java`, `scripts/evaluate-rag.sh`, `docs/rag-evaluation-results.md`
+    - *Requirements*: F-02
+
+- [x] 22. **容器化与 CI**
+    - *Priority*: MEDIUM
+    - *Goal*: 支持单命令本地部署和基础 CI 验证
+    - *Details*: 新增 `Dockerfile`、`docker-compose.yml`、`.dockerignore`、GitHub Actions workflow；CI 执行 Maven test 和 Docker build
+    - *Affected files*: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `.github/workflows/ci.yml`
+    - *Requirements*: 运维
 
 ## Task Dependencies
 
@@ -186,5 +214,5 @@ Task 7 (测试) ── 各层完成后
 ## Current Status
 
 - **MVP 已实现**: Task 1-7 全部完成，编译通过，启动成功（4.5s），单元测试全绿
-- **已修复**: Task 8-18 已完成，其中 `@Tool` 注册、性能基准脚本、真实 LLM 测试隔离已落地
-- **当前状态**: MVP 功能闭环已完成；剩余工作是跑真实基准、补检索评估集、按实测数据改简历表述
+- **已修复**: Task 8-22 已完成，其中 `@Tool` 注册、性能基准脚本、真实 LLM 测试隔离、FixAgent、Agent 链式协同、RAG 评估入口、容器化与 CI 已落地
+- **当前状态**: MVP 功能闭环、自动修复接口、Security → Fix 链式协同、RAG 小规模评估、容器化已完成；剩余工作是实仓验证、跑真实基准、按实测数据调优并改简历表述
