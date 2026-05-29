@@ -42,3 +42,5 @@ src/main/resources/application-local.yml
 
 ### Local service data ###
 volumes/
+springVersion/docs/resume-argus-project.md
+springVersion/docs/resume-vs-reality-analysis.md
