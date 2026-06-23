@@ -1,11 +1,11 @@
 package com.argus.review;
 
-import com.argus.review.infrastructure.llm.PackyCodeChatModel;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -25,12 +25,12 @@ class PackyCodeDebugTest {
     void debugRawResponse() throws Exception {
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
 
-        PackyCodeChatModel model = PackyCodeChatModel.builder()
+        OpenAiChatModel model = OpenAiChatModel.builder()
             .baseUrl("https://api.deepseek.com")
             .apiKey(apiKey)
             .modelName("deepseek-v4-pro")
             .reasoningEffort("high")
-            .thinkingType("enabled")
+            .sendThinking(true, "enabled")
             .build();
 
         List<ChatMessage> messages = List.of(
@@ -38,9 +38,9 @@ class PackyCodeDebugTest {
             UserMessage.from("Review this code for SQL injection: String sql = \"SELECT * FROM users WHERE name = '\" + input + \"'\";")
         );
 
-        Response<AiMessage> response = model.generate(messages);
+        ChatResponse response = model.chat(messages);
         System.out.println("=== Response text ===");
-        System.out.println("[" + response.content().text() + "]");
+        System.out.println("[" + response.aiMessage().text() + "]");
         System.out.println("=== Token usage ===");
         System.out.println(response.tokenUsage());
     }

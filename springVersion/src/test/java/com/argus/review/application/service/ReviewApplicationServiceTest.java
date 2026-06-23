@@ -8,7 +8,7 @@ import com.argus.review.domain.agent.SecurityAgent;
 import com.argus.review.domain.agent.StyleAgent;
 import com.argus.review.domain.rag.RetrievalService;
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.service.TokenStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -241,7 +241,7 @@ class ReviewApplicationServiceTest {
 
         private final List<String> tokens;
         private java.util.function.Consumer<String> tokenConsumer = token -> {};
-        private java.util.function.Consumer<Response<AiMessage>> completionConsumer = response -> {};
+        private java.util.function.Consumer<ChatResponse> completionConsumer = response -> {};
         private java.util.function.Consumer<Throwable> errorConsumer = error -> {};
 
         private StubTokenStream(List<String> tokens) {
@@ -249,7 +249,7 @@ class ReviewApplicationServiceTest {
         }
 
         @Override
-        public TokenStream onNext(java.util.function.Consumer<String> consumer) {
+        public TokenStream onPartialResponse(java.util.function.Consumer<String> consumer) {
             this.tokenConsumer = consumer;
             return this;
         }
@@ -265,7 +265,7 @@ class ReviewApplicationServiceTest {
         }
 
         @Override
-        public TokenStream onComplete(java.util.function.Consumer<Response<AiMessage>> consumer) {
+        public TokenStream onCompleteResponse(java.util.function.Consumer<ChatResponse> consumer) {
             this.completionConsumer = consumer;
             return this;
         }
@@ -288,7 +288,9 @@ class ReviewApplicationServiceTest {
                 for (String token : tokens) {
                     tokenConsumer.accept(token);
                 }
-                completionConsumer.accept(Response.from(AiMessage.from(String.join("", tokens))));
+                completionConsumer.accept(ChatResponse.builder()
+                    .aiMessage(AiMessage.from(String.join("", tokens)))
+                    .build());
             } catch (Throwable throwable) {
                 errorConsumer.accept(throwable);
             }

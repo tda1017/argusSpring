@@ -1,12 +1,12 @@
 package com.argus.review;
 
-import com.argus.review.infrastructure.llm.PackyCodeStreamingChatModel;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.StreamingResponseHandler;
-import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -24,12 +24,12 @@ class Gpt54StreamingTest {
     void testStreaming() throws Exception {
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
 
-        PackyCodeStreamingChatModel model = PackyCodeStreamingChatModel.builder()
+        OpenAiStreamingChatModel model = OpenAiStreamingChatModel.builder()
             .baseUrl("https://api.deepseek.com")
             .apiKey(apiKey)
             .modelName("deepseek-v4-pro")
             .reasoningEffort("high")
-            .thinkingType("enabled")
+            .sendThinking(true, "enabled")
             .build();
 
         List<ChatMessage> messages = List.of(
@@ -38,18 +38,18 @@ class Gpt54StreamingTest {
         );
 
         StringBuilder sb = new StringBuilder();
-        CompletableFuture<Response<AiMessage>> future = new CompletableFuture<>();
+        CompletableFuture<ChatResponse> future = new CompletableFuture<>();
 
-        model.generate(messages, new StreamingResponseHandler<AiMessage>() {
+        model.chat(messages, new StreamingChatResponseHandler() {
             @Override
-            public void onNext(String token) {
+            public void onPartialResponse(String token) {
                 sb.append(token);
                 System.out.print(token);
                 System.out.flush();
             }
 
             @Override
-            public void onComplete(Response<AiMessage> response) {
+            public void onCompleteResponse(ChatResponse response) {
                 System.out.println("\n\n[COMPLETE] Tokens: " + response.tokenUsage());
                 future.complete(response);
             }

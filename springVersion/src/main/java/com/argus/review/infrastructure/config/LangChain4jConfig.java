@@ -1,12 +1,13 @@
 package com.argus.review.infrastructure.config;
 
-import com.argus.review.infrastructure.llm.PackyCodeChatModel;
-import com.argus.review.infrastructure.llm.PackyCodeStreamingChatModel;
 import dev.langchain4j.data.segment.TextSegment;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+import dev.langchain4j.http.client.jdk.JdkHttpClientBuilder;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.embedding.onnx.bgesmallenv15q.BgeSmallEnV15QuantizedEmbeddingModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 import dev.langchain4j.store.embedding.milvus.MilvusEmbeddingStore;
@@ -22,7 +23,7 @@ import java.time.Duration;
 
 /**
  * LangChain4j 基础设施配置。
- * <p>使用自定义 OpenAI 兼容客户端，以兼容 DeepSeek / packycode 的 SSE 输出。</p>
+ * <p>使用 LangChain4j 官方 OpenAI 兼容客户端，对接 DeepSeek / packycode。</p>
  */
 @Configuration
 public class LangChain4jConfig {
@@ -82,14 +83,16 @@ public class LangChain4jConfig {
      * 同步对话模型，供一次性审查调用。
      */
     @Bean
-    public ChatLanguageModel chatLanguageModel() {
-        return PackyCodeChatModel.builder()
+    public ChatModel chatLanguageModel() {
+        // 官方 OpenAI 兼容客户端已支持 reasoning/thinking 参数，别再维护自定义协议解析。
+        return OpenAiChatModel.builder()
+            .httpClientBuilder(new JdkHttpClientBuilder())
             .baseUrl(baseUrl)
             .apiKey(apiKey)
             .modelName(modelName)
             .temperature(temperature)
             .reasoningEffort(reasoningEffort)
-            .thinkingType(thinkingType)
+            .sendThinking(!thinkingType.isBlank(), thinkingType)
             .timeout(Duration.ofSeconds(60))
             .build();
     }
@@ -98,14 +101,15 @@ public class LangChain4jConfig {
      * 流式对话模型，供 SSE 审查接口逐 token 推送。
      */
     @Bean
-    public StreamingChatLanguageModel streamingChatLanguageModel() {
-        return PackyCodeStreamingChatModel.builder()
+    public StreamingChatModel streamingChatLanguageModel() {
+        return OpenAiStreamingChatModel.builder()
+            .httpClientBuilder(new JdkHttpClientBuilder())
             .baseUrl(baseUrl)
             .apiKey(apiKey)
             .modelName(modelName)
             .temperature(temperature)
             .reasoningEffort(reasoningEffort)
-            .thinkingType(thinkingType)
+            .sendThinking(!thinkingType.isBlank(), thinkingType)
             .timeout(Duration.ofSeconds(120))
             .build();
     }

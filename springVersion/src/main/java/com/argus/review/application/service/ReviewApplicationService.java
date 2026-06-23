@@ -163,8 +163,8 @@ public class ReviewApplicationService implements ReviewUseCase {
             return Flux.empty();
         }
         return Flux.create(sink -> tokenStream
-            .onNext(token -> sink.next("[" + label + "] " + token))
-            .onComplete(response -> sink.complete())
+            .onPartialResponse(token -> sink.next("[" + label + "] " + token))
+            .onCompleteResponse(response -> sink.complete())
             .onError(sink::error)
             .start());
     }

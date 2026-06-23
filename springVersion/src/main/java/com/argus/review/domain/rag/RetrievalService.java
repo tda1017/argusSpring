@@ -4,6 +4,7 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
+import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,9 +33,11 @@ public class RetrievalService {
     public String retrieveRelevantContext(String query, int maxResults, double minScore) {
         Embedding queryEmbedding = embeddingModel.embed(query).content();
 
-        List<EmbeddingMatch<TextSegment>> matches = embeddingStore.findRelevant(
-            queryEmbedding, maxResults, minScore
-        );
+        List<EmbeddingMatch<TextSegment>> matches = embeddingStore.search(EmbeddingSearchRequest.builder()
+            .queryEmbedding(queryEmbedding)
+            .maxResults(maxResults)
+            .minScore(minScore)
+            .build()).matches();
 
         if (matches.isEmpty()) {
             return "暂无相关内部规范。";
