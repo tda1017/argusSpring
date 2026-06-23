@@ -1,6 +1,7 @@
 package com.argus.review.aiops.persistence;
 
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -9,4 +10,6 @@ import reactor.core.publisher.Mono;
 public interface AlertRecordRepository extends ReactiveMongoRepository<AlertRecord, String> {
 
     Mono<AlertRecord> findByAlertId(String alertId);
+
+    Flux<AlertRecord> findTop50ByOrderByCreatedAtDesc();
 }

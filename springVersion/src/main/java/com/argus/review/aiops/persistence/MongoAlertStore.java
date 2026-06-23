@@ -3,6 +3,7 @@ package com.argus.review.aiops.persistence;
 import com.argus.review.aiops.model.AlertEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -24,5 +25,10 @@ public class MongoAlertStore implements AlertStore {
     public Mono<AlertEvent> findByAlertId(String alertId) {
         return repository.findByAlertId(alertId)
             .map(AlertRecord::getAlert);
+    }
+
+    @Override
+    public Flux<AlertRecord> findRecent() {
+        return repository.findTop50ByOrderByCreatedAtDesc();
     }
 }

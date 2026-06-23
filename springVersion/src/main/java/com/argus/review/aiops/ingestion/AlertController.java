@@ -6,11 +6,13 @@ import com.argus.review.aiops.persistence.AlertStore;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 import java.util.Map;
 
@@ -34,6 +36,31 @@ public class AlertController {
                 .map(saved -> new AlertResponse(saved.alertId(), suppressed)));
     }
 
+    @GetMapping
+    public Flux<AlertItem> list() {
+        return alertStore.findRecent()
+            .map(record -> new AlertItem(
+                record.getAlertId(),
+                record.getAlert().serviceName(),
+                record.getAlert().alertName(),
+                record.getAlert().severity(),
+                record.getAlert().description(),
+                record.isSuppressed(),
+                record.getCreatedAt()
+            ));
+    }
+
     public record AlertResponse(String alertId, boolean suppressed) {
+    }
+
+    public record AlertItem(
+        String alertId,
+        String serviceName,
+        String alertName,
+        String severity,
+        String description,
+        boolean suppressed,
+        long createdAt
+    ) {
     }
 }

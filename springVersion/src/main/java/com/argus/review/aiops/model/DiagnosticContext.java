@@ -13,6 +13,7 @@ public class DiagnosticContext {
     private final AlertEvent alert;
     private final List<ToolResult> toolResults = new ArrayList<>();
     private final List<KnowledgeChunk> retrievedKnowledge = new ArrayList<>();
+    private String serviceProfile;
     private String rootCause;
     private String fixSuggestion;
 
@@ -41,6 +42,10 @@ public class DiagnosticContext {
         return rootCause;
     }
 
+    public String serviceProfile() {
+        return serviceProfile;
+    }
+
     public String fixSuggestion() {
         return fixSuggestion;
     }
@@ -57,6 +62,10 @@ public class DiagnosticContext {
         this.rootCause = rootCause;
     }
 
+    public void setServiceProfile(String serviceProfile) {
+        this.serviceProfile = serviceProfile;
+    }
+
     public void setFixSuggestion(String fixSuggestion) {
         this.fixSuggestion = fixSuggestion;
     }
@@ -70,6 +79,7 @@ public class DiagnosticContext {
             labels=%s
             toolResults=%s
             retrievedKnowledge=%s
+            serviceProfile=%s
             rootCause=%s
             fixSuggestion=%s
             """.formatted(
@@ -81,6 +91,7 @@ public class DiagnosticContext {
             alert.labels(),
             toolResults,
             retrievedKnowledge,
+            serviceProfile,
             rootCause,
             fixSuggestion
         );

@@ -62,4 +62,16 @@ public class RetrievalService {
         return retrieveRelevantContext(query, 3, 0.7);
     }
 
+    /**
+     * 返回结构化检索结果，供 AIOps 诊断链路复用。
+     */
+    public List<EmbeddingMatch<TextSegment>> search(String query, int maxResults, double minScore) {
+        Embedding queryEmbedding = embeddingModel.embed(query).content();
+        return embeddingStore.search(EmbeddingSearchRequest.builder()
+            .queryEmbedding(queryEmbedding)
+            .maxResults(maxResults)
+            .minScore(minScore)
+            .build()).matches();
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.argus.review.aiops.persistence;
 
 import com.argus.review.aiops.model.AlertEvent;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -11,4 +12,6 @@ public interface AlertStore {
     Mono<AlertEvent> save(AlertEvent alert, boolean suppressed);
 
     Mono<AlertEvent> findByAlertId(String alertId);
+
+    Flux<AlertRecord> findRecent();
 }

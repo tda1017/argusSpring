@@ -1,10 +1,21 @@
 package com.argus.review.aiops.diagnosis;
 
+import com.argus.review.aiops.knowledge.KnowledgeSearchService;
+import com.argus.review.aiops.memory.MemoryService;
+import com.argus.review.aiops.memory.ServiceMemoryRecord;
+import com.argus.review.aiops.memory.ServiceMemoryRepository;
 import com.argus.review.aiops.model.AlertEvent;
 import com.argus.review.aiops.model.DiagnosticContext;
+import com.argus.review.aiops.model.KnowledgeChunk;
 import com.argus.review.aiops.model.ToolResult;
 import com.argus.review.aiops.persistence.DiagnosisRecord;
 import com.argus.review.aiops.persistence.DiagnosisRecordRepository;
+import com.argus.review.aiops.remediation.ActionType;
+import com.argus.review.aiops.remediation.BlastRadius;
+import com.argus.review.aiops.remediation.RemediationAction;
+import com.argus.review.aiops.remediation.RemediationService;
+import com.argus.review.aiops.remediation.RemediationStatus;
+import com.argus.review.domain.rag.RetrievalService;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -36,12 +47,15 @@ class SupervisorAgentTest {
                 new StubAgent("metric", Mono.just(new ToolResult("metric", true, "metrics", 2))),
                 new StubAgent("trace", Mono.just(new ToolResult("trace", true, "trace", 1)))
             ),
+            stubKnowledge(),
+            stubMemory(),
+            stubRemediation(),
             new StubAnalyzer(),
             repository
         );
 
         StepVerifier.create(supervisor.diagnose(alert()).map(event -> event.type()))
-            .expectNext("start", "tool_result", "tool_result", "tool_result", "root_cause", "fix", "done")
+            .expectNext("start", "tool_result", "tool_result", "tool_result", "memory", "knowledge", "root_cause", "fix", "remediation", "done")
             .verifyComplete();
 
         assertEquals(1, saved.size());
@@ -49,6 +63,7 @@ class SupervisorAgentTest {
         assertEquals("root cause", record.getRootCause());
         assertEquals("fix suggestion", record.getFixSuggestion());
         assertEquals(3, record.getToolResults().size());
+        assertEquals(List.of("builtin:jvm-oom"), record.getRelatedCaseIds());
         assertEquals(List.of("log", "metric", "trace"),
             record.getToolResults().stream().map(ToolResult::agentName).toList());
     }
@@ -63,6 +78,9 @@ class SupervisorAgentTest {
                 new StubAgent("metric", Mono.error(new IllegalStateException("metric down"))),
                 new StubAgent("trace", Mono.just(new ToolResult("trace", true, "trace", 1)))
             ),
+            stubKnowledge(),
+            stubMemory(),
+            stubRemediation(),
             new StubAnalyzer(),
             repository
         );
@@ -92,6 +110,9 @@ class SupervisorAgentTest {
                 new StubAgent("metric", delayedResult("metric", activeAgents, maxActiveAgents)),
                 new StubAgent("trace", delayedResult("trace", activeAgents, maxActiveAgents))
             ),
+            stubKnowledge(),
+            stubMemory(),
+            stubRemediation(),
             new StubAnalyzer(),
             repository
         );
@@ -127,6 +148,49 @@ class SupervisorAgentTest {
             return Mono.just(record);
         });
         return repository;
+    }
+
+    private static KnowledgeSearchService stubKnowledge() {
+        return new KnowledgeSearchService(new RetrievalService(null, null)) {
+            @Override
+            public List<KnowledgeChunk> search(String query, int maxResults) {
+                return List.of(new KnowledgeChunk("oom runbook", 0.8, "builtin:jvm-oom"));
+            }
+        };
+    }
+
+    private static MemoryService stubMemory() {
+        return new MemoryService(mock(ServiceMemoryRepository.class)) {
+            @Override
+            public Mono<String> profile(AlertEvent alert) {
+                return Mono.just("历史画像: test");
+            }
+
+            @Override
+            public Mono<ServiceMemoryRecord> remember(DiagnosticContext context, boolean verified) {
+                return Mono.just(new ServiceMemoryRecord());
+            }
+        };
+    }
+
+    private static RemediationService stubRemediation() {
+        return mock(RemediationService.class, invocation -> {
+            if ("propose".equals(invocation.getMethod().getName())) {
+                return Mono.just(new RemediationAction(
+                    "r1",
+                    "d1",
+                    ActionType.RESTART,
+                    BlastRadius.LOW,
+                    "order-service",
+                    0.82,
+                    RemediationStatus.VERIFIED,
+                    "oom",
+                    1L,
+                    1L
+                ));
+            }
+            return invocation.callRealMethod();
+        });
     }
 
     private static AlertEvent alert() {
