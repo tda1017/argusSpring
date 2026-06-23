@@ -72,7 +72,7 @@ public class SupervisorAgent implements DiagnosisEngine {
                 .map(fix -> new DiagnosisEvent("fix", fix))
                 .flux(),
             Mono.defer(() -> repository.save(toRecord(context)))
-                .then(memoryService.remember(context, true))
+                .then(memoryService.recordOccurrence(context))
                 .then(remediationService.propose(context.diagnosisId(), alert, context.rootCause()))
                 .map(action -> new DiagnosisEvent("remediation", action.status() + ": " + action.type()))
                 .flux(),

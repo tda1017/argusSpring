@@ -1,6 +1,9 @@
 package com.argus.review.aiops.remediation;
 
 import com.argus.review.aiops.model.AlertEvent;
+import com.argus.review.aiops.memory.MemoryService;
+import com.argus.review.aiops.memory.ServiceMemoryRecord;
+import com.argus.review.aiops.memory.ServiceMemoryRepository;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -26,7 +29,8 @@ class RemediationServiceTest {
             allowBreaker(),
             action -> Mono.just("done"),
             auditRepository(audits),
-            actionRepository(new ArrayList<>())
+            actionRepository(new ArrayList<>()),
+            memoryService(null)
         );
 
         StepVerifier.create(service.propose("d1", alert("JvmOom"), "heap oom"))
@@ -41,11 +45,28 @@ class RemediationServiceTest {
             allowBreaker(),
             action -> Mono.just("done"),
             auditRepository(new ArrayList<>()),
-            actionRepository(new ArrayList<>())
+            actionRepository(new ArrayList<>()),
+            memoryService(null)
         );
 
         StepVerifier.create(service.propose("d1", alert("CodeRegression"), "code bug"))
             .expectNextMatches(action -> action.status() == RemediationStatus.PROPOSED && action.type() == ActionType.CODE_FIX)
+            .verifyComplete();
+    }
+
+    @Test
+    void shouldPromoteRepeatedSuccessfulPattern() {
+        RemediationService service = new RemediationService(
+            new RemediationPolicy(),
+            allowBreaker(),
+            action -> Mono.just("done"),
+            auditRepository(new ArrayList<>()),
+            actionRepository(new ArrayList<>()),
+            memoryService(successfulPattern())
+        );
+
+        StepVerifier.create(service.propose("d1", alert("UnknownSlow"), "unknown but repeated"))
+            .expectNextMatches(action -> action.status() == RemediationStatus.VERIFIED && action.type() == ActionType.RATE_LIMIT)
             .verifyComplete();
     }
 
@@ -76,6 +97,25 @@ class RemediationServiceTest {
         });
         when(repository.findTop50ByOrderByUpdatedAtDesc()).thenReturn(Flux.fromIterable(actions));
         return repository;
+    }
+
+    private static MemoryService memoryService(ServiceMemoryRecord pattern) {
+        ServiceMemoryRepository repository = mock(ServiceMemoryRepository.class);
+        when(repository.findFirstByServiceNameAndAlertName(org.mockito.ArgumentMatchers.eq("order-service"), org.mockito.ArgumentMatchers.anyString()))
+            .thenAnswer(invocation -> pattern == null ? Mono.empty() : Mono.just(pattern));
+        when(repository.save(org.mockito.ArgumentMatchers.any(ServiceMemoryRecord.class))).thenAnswer(invocation ->
+            Mono.just(invocation.getArgument(0))
+        );
+        return new MemoryService(repository);
+    }
+
+    private static ServiceMemoryRecord successfulPattern() {
+        ServiceMemoryRecord record = new ServiceMemoryRecord();
+        record.setServiceName("order-service");
+        record.setAlertName("UnknownSlow");
+        record.setOccurrences(5);
+        record.setVerifiedSuccesses(5);
+        return record;
     }
 
     private static AlertEvent alert(String alertName) {

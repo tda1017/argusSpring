@@ -23,6 +23,7 @@ public class RemediationAuditRecord {
     private ActionType type;
     private BlastRadius blastRadius;
     private String targetService;
+    private String alertName;
     private double confidence;
     private RemediationStatus status;
     private String reason;
@@ -35,6 +36,7 @@ public class RemediationAuditRecord {
         this.type = action.type();
         this.blastRadius = action.blastRadius();
         this.targetService = action.targetService();
+        this.alertName = action.alertName();
         this.confidence = action.confidence();
         this.status = action.status();
         this.reason = action.reason();

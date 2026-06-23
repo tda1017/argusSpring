@@ -167,7 +167,7 @@ class SupervisorAgentTest {
             }
 
             @Override
-            public Mono<ServiceMemoryRecord> remember(DiagnosticContext context, boolean verified) {
+            public Mono<ServiceMemoryRecord> recordOccurrence(DiagnosticContext context) {
                 return Mono.just(new ServiceMemoryRecord());
             }
         };
@@ -182,6 +182,7 @@ class SupervisorAgentTest {
                     ActionType.RESTART,
                     BlastRadius.LOW,
                     "order-service",
+                    "JvmOom",
                     0.82,
                     RemediationStatus.VERIFIED,
                     "oom",

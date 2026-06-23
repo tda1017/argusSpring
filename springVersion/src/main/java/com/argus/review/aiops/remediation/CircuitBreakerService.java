@@ -22,7 +22,12 @@ public class CircuitBreakerService {
     public Mono<Boolean> allow(String serviceName) {
         String key = "aiops:remediation:circuit:" + serviceName;
         return redisTemplate.opsForValue().increment(key)
-            .flatMap(count -> redisTemplate.expire(key, WINDOW).thenReturn(count <= LIMIT))
+            .flatMap(count -> {
+                if (count == 1L) {
+                    return redisTemplate.expire(key, WINDOW).thenReturn(true);
+                }
+                return Mono.just(count <= LIMIT);
+            })
             .onErrorReturn(true);
     }
 }
